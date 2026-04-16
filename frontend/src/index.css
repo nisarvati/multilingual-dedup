@@ -1,0 +1,103 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Premium dark data-intelligence design system. All colors HSL. */
+
+@layer base {
+  :root {
+    /* Mapped from spec hex values */
+    --background: 213 33% 6%;          /* #0B0F14 */
+    --foreground: 220 13% 91%;         /* #E5E7EB */
+
+    --surface: 220 26% 12%;            /* #111827 */
+    --surface-elevated: 220 24% 15%;
+    --card: 220 26% 12%;
+    --card-foreground: 220 13% 91%;
+
+    --popover: 220 26% 12%;
+    --popover-foreground: 220 13% 91%;
+
+    --primary: 217 91% 60%;            /* #3B82F6 electric blue */
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 217 91% 70%;
+
+    --secondary: 220 24% 15%;
+    --secondary-foreground: 220 13% 91%;
+
+    --muted: 220 24% 15%;
+    --muted-foreground: 220 9% 46%;    /* #6B7280 */
+    --subtle-foreground: 220 9% 64%;   /* #9CA3AF */
+
+    --accent: 217 91% 60%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;          /* #EF4444 */
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 71% 45%;            /* #22C55E */
+    --warning: 38 92% 50%;             /* #F59E0B */
+
+    --border: 220 26% 18%;             /* #1F2937 */
+    --input: 220 26% 18%;
+    --ring: 217 91% 60%;
+
+    --radius: 1rem;
+
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(252 83% 65%));
+    --gradient-surface: linear-gradient(180deg, hsl(220 26% 12%), hsl(220 26% 9%));
+    --gradient-glow: radial-gradient(circle at top, hsl(217 91% 60% / 0.15), transparent 60%);
+
+    --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.4), 0 4px 16px hsl(0 0% 0% / 0.25);
+    --shadow-elevated: 0 8px 32px hsl(0 0% 0% / 0.45);
+    --shadow-glow: 0 0 0 1px hsl(217 91% 60% / 0.3), 0 8px 32px hsl(217 91% 60% / 0.2);
+
+    --sidebar-background: 220 28% 8%;
+    --sidebar-foreground: 220 13% 91%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 26% 14%;
+    --sidebar-accent-foreground: 220 13% 91%;
+    --sidebar-border: 220 26% 16%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
+  /* Force dark feel as default — light theme not supported */
+  .dark {
+    --background: 213 33% 6%;
+    --foreground: 220 13% 91%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-image: var(--gradient-glow);
+    background-attachment: fixed;
+  }
+}
+
+@layer utilities {
+  .surface {
+    background: hsl(var(--surface));
+  }
+  .surface-elevated {
+    background: hsl(var(--surface-elevated));
+  }
+  .text-subtle {
+    color: hsl(var(--subtle-foreground));
+  }
+  .glow-ring {
+    box-shadow: var(--shadow-glow);
+  }
+  .scrollbar-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 8px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+}
