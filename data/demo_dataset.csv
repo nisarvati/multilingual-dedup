@@ -1,0 +1,447 @@
+id,text,language,entity_type
+R0064,โซนี่ เพลย์สเตชั่น 5,th,product
+R0160,Amazon,en,company
+R0115,บริษัท ไมโครซอฟท์.,th,company
+R0326,एलजी वॉशिंग मशीन,hi,product
+R0104,Microsoft Corporation.,en,company
+R0044,삼성 갤럭시 S24,ko,product
+R0305,น้ำส้ม,th,product
+R0302,संतरे का रस,hi,product
+R0282,चॉकलेट बार असली,hi,product
+R0240,ชาเขียว,th,product
+R0069,Nike Air Max 90.,en,product
+R0298,橙汁,zh,product
+R0133,ए्पपल इंक,hi,company
+R0176,아마존,ko,company
+R0417,iPhone 15 Pro,en,product
+R0318,LG 洗濯機,ja,product
+R0149,شركة جوجل,ar,company
+R0294,オレンジジュース,ja,product
+R0238,हरी चाय,hi,product
+R0233,绿茶,zh,product
+R0048,Sony PlayStation 5,en,product
+R0183,テスラ,ja,company
+R0099,โตโยต้า แคมรี่,th,product
+R0289,Orange Juice,en,product
+R0425,Apple Inc,en,product
+R0364,كاميرا كانون EOS,ar,product
+R0205,コカ・コーラ,ja,product
+R0257,تفاحة حمراء,ar,product
+R0109,微软公司!,zh,company
+R0423,Microsoft Corporation,en,product
+R0390,กางเกงยีนส์สีน้ำเงิน,th,product
+R0400,Leather Wallet,en,product
+R0275,巧克力棒,zh,product
+R0310,오렌지 주스,ko,product
+R0216,कोका कोला,hi,product
+R0281,चॉकलेट बार,hi,product
+R0277,لوح شوكولاتة,ar,product
+R0300,عصير برتقال,ar,product
+R0350,델 노트북 XPS 15,ko,product
+R0312,오렌지 주스,ko,product
+R0432,Honda Civic,en,product
+R0201,테슬라 모터스,ko,company
+R0374,Blue Denim Jeans,en,product
+R0112,माइक्रोसॉफ्ट कॉर्पोरेशन,hi,company
+R0431,BMW Series 3,en,product
+R0200,테슬라 모터스,ko,company
+R0287,초콜릿 바,ko,product
+R0022,아폰이 15 프로,ko,product
+R0027,サムスン ギャラクシー S24,ja,product
+R0407,محفظة ج لدية,ar,product
+R0110,شركة مايكروسوفت,ar,company
+R0208,可口可乐,zh,product
+R0082,ไนกี้ แอร์แม็กซ์ 90,th,product
+R0354,キヤノン EOS カメラ,ja,product
+R0073,ナイキ エアマックス 90,ja,product
+R0271,Chocolate Bar,en,product
+R0367,कैनन EOS कैमरा.,hi,product
+R0091,丰田凯美瑞,zh,product
+R0401,革の財布,ja,product
+R0389,नीली डेनिम जींस असली,hi,product
+R0337,Dell aLptop XPS 15,en,product
+R0128,苹果公司,zh,company
+R0386,नीली डेनिम जींस,hi,product
+R0202,Coca-Cola,en,product
+R0422,Nike Air Max 95,en,product
+R0106,マイクロソフト株式会社,ja,company
+R0089,トヨタ カムリ 正規品,ja,product
+R0434,Pepsi Cola,en,product
+R0252,红苹果,zh,product
+R0424,Microsoft Corp.,en,product
+R0412,กระเป๋าสตางค์หนัง,th,product
+R0132,एप्पल इंक,hi,company
+R0189,تسلا موتورز,ar,company
+R0440,ميرسيدس بنز,ar,product
+R0387,नीली डेनिम जींस,hi,product
+R0349,เดลล์ แล็ปท็อป XPS 15,th,product
+R0116,บริษัท ไมโครซอฟท์ ,th,company
+R0011,苹果手机  15 Pro,zh,product
+R0266,빨간 사과,ko,product
+R0199,테슬라모 터스,ko,company
+R0429,Lenovo ThinkPad X1,en,product
+R0413,กระเป๋าสตางค์หนัง,th,product
+R0146,谷歌,zh,company
+R0414,가죽 지갑,ko,product
+R0062,सोनी प्लेस्टेशन  5,hi,product
+R0418,iPhone 15 Pro Max,en,product
+R0249,赤いりんご 正規品,ja,product
+R0083,ไนกี้ แอร์แม็กซ์ 90 ใหม่,th,product
+R0059,सोनी प्लेस्टेशन 5,hi,product
+R0366,कैनन Eos कैमरा,hi,product
+R0067,Nike Air Max 90,en,product
+R0378,ブルーデニムジーンズ 送料無料,ja,product
+R0419,Samsung Galaxy S24,en,product
+R0079,نايكي اير ماكس 90,ar,product
+R0331,LG 세탁기,ko,product
+R0273,チョコレートバー,ja,product
+R0259,लाल सेब,hi,product
+R0014,آيفون 51 برو,ar,product
+R0304,संतरे का रस,hi,product
+R0253,红苹果,zh,product
+R0264,แอปเปิ้ลแดง,th,product
+R0179,Tesla Motors,en,company
+R0308,น้ำส้ม ของแท้,th,product
+R0225,Green Tea,en,product
+R0369,กล้องแคนนอน Eos,th,product
+R0209,可口可乐,zh,product
+R0185,テスラ,ja,company
+R0214,كوكا كولا,ar,product
+R0410,चमड़े का बटुआ,hi,product
+R0156,구글,ko,company
+R0398,Leathe rWallet,en,product
+R0360,佳能 E OS 相机,zh,product
+R0130,شركة آبل,ar,company
+R0393,กางเกงียนส์สีน้ำเงิน,th,product
+R0003,iPhone 15 Por,en,product
+R0399,LeatherW allet,en,product
+R0246,Red Apple,en,product
+R0031,三星 Galaxy S24,zh,product
+R0101,토요타 캠리,ko,product
+R0263,แอปเปิ้ลแดง,th,product
+R0046,삼성 갤럭시 S24,ko,product
+R0420,Samsung Galaxy S24 Ultra,en,product
+R0292,OrangeJ uice,en,product
+R0244,녹차,ko,product
+R0111,شركة مايكروسوفت,ar,company
+R0135,บริษัท แอปเปิล,th,company
+R0385,جينز أزرق,ar,product
+R0045,삼 성 갤럭시 S24,ko,product
+R0381,蓝色牛仔裤,zh,product
+R0034,سامسونج جالاكسي S24,ar,product
+R0134,บริษัท แอปเปิล,th,company
+R0247,Red Apple!,en,product
+R0001,iPhone 15 Pro,en,product
+R0416,가죽 지갑,ko,product
+R0085,나이키 어에맥스 90,ko,product
+R0411,चमड़े का बटुआ.,hi,product
+R0162,アマゾン,ja,company
+R0054,索尼 PlayStatoin 5,zh,product
+R0267,빨간 사과,ko,product
+R0053,索尼 PlayStation 5,zh,product
+R0033,三星 Galaxy S24 ,zh,product
+R0063,โซนี่ เพลย์สเตชั่น 5,th,product
+R0368,กล้องแคนนอน EOS,th,product
+R0013,آيفون 15 برو,ar,product
+R0006,アイフォン 15 プロ 新品,ja,product
+R0322,غسالة LG,ar,product
+R0268,빨간 사과!,ko,product
+R0178,아마존 ,ko,company
+R0220,โคคา-โคล่า,th,product
+R0049,ソニー プレイステーション 5,ja,product
+R0345,حاسوب محمول ديل XPS 15 أصلي,ar,product
+R0224,코카콜라,ko,product
+R0016,आईफोन 15 प्रो,hi,product
+R0092,تويوتا كامري,ar,product
+R0256,تفاحة حمراء,ar,product
+R0288,초콜릿바,ko,product
+R0357,キヤノン EOS カメラ,ja,product
+R0352,Canon EOS Camera,en,product
+R0182,テスラ,ja,company
+R0161,アマゾン,ja,company
+R0114,บริษัท ไมโครซอฟท์,th,company
+R0056,سوني بلايستيشن 5,ar,product
+R0348,เดลล์ แล็ปท็อป XPS 15,th,product
+R0009,苹果手机 15 Pro,zh,product
+R0072,ナイキ エアマックス 90 送料無料,ja,product
+R0191,تسلا موتورز.,ar,company
+R0158,Amazon,en,company
+R0339,デル ノートパソコ ンXPS 15,ja,product
+R0379,蓝色牛仔裤,zh,product
+R0262,แอปเปิ้ลแดง,th,product
+R0107,マイロクソフト株式会社,ja,company
+R0040,ซัมซุง กาแลคซี่ S24,th,product
+R0330,LG 세탁기,ko,product
+R0108,微软公司,zh,company
+R0139,애 플,ko,company
+R0172,अमेज़न,hi,company
+R0415,가죽 지갑,ko,product
+R0219,โคคา-โคล่า,th,product
+R0100,โตโยต้า แคมรี่,th,product
+R0035,سامسونج جالكاسي S24,ar,product
+R0235,شاي أخضر,ar,product
+R0061,सोनी प्लेस्टेशन 5 नया,hi,product
+R0025,Samsung Galaxy S24,en,product
+R0190,تسلا موتورز جديد,ar,company
+R0127,苹果公司,zh,company
+R0193,टेस्ला मोटर्स,hi,company
+R0010,苹果手机 15 Pro,zh,product
+R0284,ช็อโกกแลตบาร์,th,product
+R0347,डेल लैपटॉप XPS 15,hi,product
+R0365,कैनन EOS कैमरा,hi,product
+R0105,Microsoft Corporation Free Shipping,en,company
+R0332,LG  세탁기,ko,product
+R0384,جينز أزرق,ar,product
+R0180,TeslaM otors,en,company
+R0311,오렌지 주스,ko,product
+R0353,Canon EOS Camera,en,product
+R0017,आईफोन 15 प्रो,hi,product
+R0166,亚马逊,zh,company
+R0057,سوني بلايستيشن 5,ar,product
+R0157,구글,ko,company
+R0084,나이키 에어맥스 90,ko,product
+R0144,グーグル,ja,company
+R0269,Chocolate Bar,en,product
+R0007,アイフォン 15 ロプ,ja,product
+R0356,キヤノン EOS カメラ!,ja,product
+R0060,सोन ी प्लेस्टेशन 5,hi,product
+R0215,كوك ا كولا,ar,product
+R0028,サムスン ギャラクシー s24,ja,product
+R0096,टोयोटा कैमरी,hi,product
+R0164,アマゾン 新品,ja,company
+R0323,غسالة LG,ar,product
+R0361,كاميرا كانون EOS,ar,product
+R0150,شركة جوجل,ar,company
+R0222,코카콜라!,ko,product
+R0230,绿茶,zh,product
+R0245,녹차 ,ko,product
+R0232,绿茶,zh,product
+R0095,تويوتا كامري,ar,product
+R0343,حاسوب محمول ديل XPS 15,ar,product
+R0032,三星Galaxy S24,zh,product
+R0138,애플,ko,company
+R0380,蓝色牛仔裤,zh,product
+R0004,iPhone 15 Pro,en,product
+R0231,绿茶,zh,product
+R0406,محفظة جلدية,ar,product
+R0359,佳能 EOS 相机 包邮,zh,product
+R0094,تويوتا كامري جديد,ar,product
+R0143,Google Llc,en,company
+R0351,델 노트북 xps 15,ko,product
+R0217,कोाक कोला,hi,product
+R0397,Leather Wallet,en,product
+R0173,अमेजऩ,hi,company
+R0186,特斯拉,zh,company
+R0363,كاميرا اكنون EOS,ar,product
+R0327,एलजी वॉशिंग मशीन असली,hi,product
+R0058,سوني بلايستينش 5,ar,product
+R0403,皮革钱包,zh,product
+R0037,सैमसंग गैलेक्सी S2 4,hi,product
+R0020,ไอโฟน 15 โปร,th,product
+R0395,블루 데님 진,ko,product
+R0030,三星 Galaxy S24,zh,product
+R0206,コカ・ーコラ,ja,product
+R0087,Toyota Camry,en,product
+R0341,戴尔笔记本电脑 XPS 15,zh,product
+R0328,เครื่องซักผ้า LG,th,product
+R0076,نايكي اير ماكس 90,ar,product
+R0207,コカ・コーラ,ja,product
+R0291,Orange Juice,en,product
+R0315,LGWashing Machine,en,product
+R0441,शाओमी फोन,hi,product
+R0212,كوكا كولا,ar,product
+R0295,オレンジジュース,ja,product
+R0066,소니 플레이스테이션 5,ko,product
+R0043,삼성 갤럭시 S24,ko,product
+R0433,Adidas Stan Smith,en,product
+R0445,LG 냉장고,ko,product
+R0188,تسلا موتورز,ar,company
+R0265,แอปเปิ้ลแดง.,th,product
+R0103,Microsoft Corporation,en,company
+R0319,LG 洗濯機,ja,product
+R0426,Apple Incorporated,en,product
+R0168,亚 马逊,zh,company
+R0285,ช็อกโกแลตบาร์ ใหม่,th,product
+R0342,戴尔笔记本电脑 XPS 15,zh,product
+R0068,Ni ke Air Max 90,en,product
+R0187,特斯拉!,zh,company
+R0018,ไอโฟน 15 โปร,th,product
+R0376,ブルーデニムジーンズ,ja,product
+R0159,Amazon (Brand New),en,company
+R0021,아이폰 15 프로,ko,product
+R0050,ソニー プレイステーション 5,ja,product
+R0071,ナイキ エアマックス 90 正規品,ja,product
+R0296,オレンジジュース,ja,product
+R0435,パナソニック テレビ,ja,product
+R0113,माइक्रोसॉफ्ट कॉर्पोरेशन!,hi,company
+R0181,Tesla Motors,en,company
+R0118,마이크로소프트 정품,ko,company
+R0147,谷歌 正品,zh,company
+R0314,Lg Washing Machine,en,product
+R0026,Samsung Galaxy S24,en,product
+R0306,น้ำส้ม,th,product
+R0141,Google LLC,en,company
+R0203,Coca-Cola,en,product
+R0012,آيفون 15 برو,ar,product
+R0286,초콜릿 바,ko,product
+R0152,गूगल,hi,company
+R0329,เครื่องซักผ้าLG,th,product
+R0316,LG 洗濯機,ja,product
+R0122,Apple nIc,en,company
+R0055,سوني بلايستيشن 5,ar,product
+R0409,चमड़े का बटुआ नया,hi,product
+R0443,ยาสูบ,th,product
+R0102,토요타 캠리.,ko,product
+R0155,บริษ ัท กูเกิล,th,company
+R0373,캐논 EOS 카메라,ko,product
+R0129,شركة آبل,ar,company
+R0218,โคคา-โคล่า,th,product
+R0335,Dell Laptop XPS 15,en,product
+R0408,चमड़े का बटुआ,hi,product
+R0227,緑茶,ja,product
+R0038,सैमसंग गैलेक्सी S24,hi,product
+R0081,नाइकी एयर मकै्स 90,hi,product
+R0280,لوحشوكولاتة,ar,product
+R0344,حاسوب محمول ديل XPS 15,ar,product
+R0239,हरी चाय असली,hi,product
+R0005,アイフォン 15 プロ,ja,product
+R0309,오렌지 주스,ko,product
+R0236,شاي أخضر,ar,product
+R0131,एप्पल इंक,hi,company
+R0237,हरी चाय,hi,product
+R0119,Apple Inc,en,company
+R0371,กล้องแคนนนอ EOS,th,product
+R0299,عصير برتقال,ar,product
+R0255,تفاحة حمراء,ar,product
+R0124,アップル,ja,company
+R0388,नीली डेनिम जींस असली,hi,product
+R0313,LG Washing Machine,en,product
+R0041,ซัมซุง กาแลคซี่ S24 ใหม่,th,product
+R0090,丰田凯美瑞,zh,product
+R0088,トヨタ カムリ,ja,product
+R0093,تويوتا كامري أصلي,ar,product
+R0290,Orange Juice - Official,en,product
+R0394,블루 데님 진,ko,product
+R0272,チョコレートバー,ja,product
+R0126,苹公果司,zh,company
+R0437,华为手机 P60,zh,product
+R0221,코카콜라,ko,product
+R0192,टेस्ला मोटर्स,hi,company
+R0184,テスラ,ja,company
+R0151,شركة جوجل جديد,ar,company
+R0029,サムスン ギャラクシー S24,ja,product
+R0167,亚马逊,zh,company
+R0024,아이폰 15 프로,ko,product
+R0015,आईफोन 15 प्रो,hi,product
+R0154,บริษัท กูเกิล,th,company
+R0086,Toyota Camry,en,product
+R0228, 緑茶,ja,product
+R0375,Blue Deni m Jeans,en,product
+R0325,एलजी वॉशिंग मशीन,hi,product
+R0051,ソニー プレイステーション 5,ja,product
+R0223, 코카콜라,ko,product
+R0047,Sony PlayStation 5,en,product
+R0117,마이크로소프트,ko,company
+R0148,شركة جوجل,ar,company
+R0324,एलजी वॉशिंग मशीन,hi,product
+R0121,Apple Icn,en,company
+R0430,Nintendo Switch,en,product
+R0317,LG 洗濯機,ja,product
+R0427,Google LLC,en,product
+R0278,لوح وشكولاتة,ar,product
+R0250,赤いりごん,ja,product
+R0321,LG洗衣机,zh,product
+R0392,กางเกงยีนส์สีน้ำเงิน,th,product
+R0195,टेस्ला मोटर्स,hi,company
+R0274,チョコレートバー 正規品,ja,product
+R0346,डेल लैपटॉप XPS 15,hi,product
+R0169,أمازون,ar,company
+R0042,ซัมซุง กาแลคซี่ S24,th,product
+R0333,LG 세탁기,ko,product
+R0204,コカ・コーラ,ja,product
+R0355,キヤノン EOS カメラ 送料無料,ja,product
+R0320,LG 洗衣机,zh,product
+R0174,แอมะซอน,th,company
+R0136,บร ิษัท แอปเปิล,th,company
+R0241,ชาเขียว.,th,product
+R0039,ซัมซุง กาแลคซี่ S24,th,product
+R0080,नाइकी एयर मैक्स 90,hi,product
+R0336,Dell Laptop XPS 15 - Official,en,product
+R0210,可口可乐 正品,zh,product
+R0074,耐克 Air Max 90,zh,product
+R0370,กล้องแคนนอน EOS,th,product
+R0008,アイフォン 15 プロ.,ja,product
+R0402,革の財布,ja,product
+R0270,Chocolate Bar,en,product
+R0377,ブルーデニムジーンズ,ja,product
+R0226,Green Tea Free Shipping,en,product
+R0052,索尼 PlayStation 5,zh,product
+R0170,أمازون,ar,company
+R0303,संतरे का रस,hi,product
+R0258,تفاحة حمراء.,ar,product
+R0065,소니 플레이스테이션 5,ko,product
+R0019,ไอโฟน 15 โปร,th,product
+R0254,红苹果,zh,product
+R0078,نايكي اير ماكس 90,ar,product
+R0334,Dell Laptop XPS 15,en,product
+R0340,デル ノートパソコン XPS  15,ja,product
+R0198,테슬라 모터스,ko,company
+R0196,เทสลา,th,company
+R0446,현대 자동차,ko,product
+R0243,ชาขเียว,th,product
+R0382,جينز أزرق,ar,product
+R0163,アマゾン,ja,company
+R0023,아이폰 15 프로,ko,product
+R0211,可口可乐,zh,product
+R0120,Apple Inc,en,company
+R0436,ニコン カメラ,ja,product
+R0293,オレンジジュース,ja,product
+R0123,アップル,ja,company
+R0358,佳能 EOS 相机,zh,product
+R0097,टोयोटा कैमरी,hi,product
+R0165,亚马逊,zh,company
+R0439,هواوي ماتي 50,ar,product
+R0194,टेस्ला मोटर्स,hi,company
+R0279,لوح شوكولاةت,ar,product
+R0391,กางเกงยีนส์สีน้ำเงิน,th,product
+R0438,小米电视,zh,product
+R0171,أمازون,ar,company
+R0177,아 마존,ko,company
+R0442,एमजी मोटर,hi,product
+R0276,巧克力棒,zh,product
+R0229,緑茶,ja,product
+R0077,نايكي اير ماكس 90,ar,product
+R0251,赤いんりご,ja,product
+R0338,デル ノートパソコン XPS 15,ja,product
+R0297,橙汁,zh,product
+R0301,عصير برتقال,ar,product
+R0153,गूगल,hi,company
+R0372,캐논 EOS 카메라,ko,product
+R0145,グーグル 新品,ja,company
+R0002,iphone 15 pro,en,product
+R0421,Nike Air Max 90,en,product
+R0137,애플,ko,company
+R0260,लाल सेब,hi,product
+R0404,皮革钱包,zh,product
+R0175,แอมะซอน ของแท้,th,company
+R0444,รองเท้าผ้าใบ,th,product
+R0405,皮革钱包,zh,product
+R0396,블루 데님 진,ko,product
+R0142,Google LLC,en,company
+R0036,सैमसंग गैलेक्सी S24,hi,product
+R0070,ナイキ エアマックス 90,ja,product
+R0383,جيزن أزرق,ar,product
+R0261,लाल सेब.,hi,product
+R0307,น้ำ้สม,th,product
+R0098,टोयोटा कैमरी,hi,product
+R0197,เทสลา,th,company
+R0075,耐克 Air Max 90,zh,product
+R0283,ช็อกโกแลตบาร์,th,product
+R0234,شاي أخضر,ar,product
+R0125,苹果公司,zh,company
+R0242,ชาเขียว ของแท้,th,product
+R0248,赤いりんご,ja,product
+R0428,Google Limited Liability Company,en,product
+R0213,كوك اكولا,ar,product
+R0140,Google LLC,en,company
+R0362,كاميراكانون EOS,ar,product
