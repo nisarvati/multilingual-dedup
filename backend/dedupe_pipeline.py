@@ -27,6 +27,8 @@ from rapidfuzz import fuzz
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 
+from dotenv import load_dotenv
+load_dotenv()
 # ============================================================
 # CONFIG
 # ============================================================
@@ -286,19 +288,21 @@ def evaluate(
 # GREY-ZONE DETECTION
 # ============================================================
 
-def find_grey_zone_pairs(
-    records: List[Dict],
-    score_matrix: np.ndarray,
-    threshold: float,
-    band: float = 0.02,
-) -> List[Tuple[int, int, float]]:
+def find_grey_zone_pairs(records, score_matrix, threshold, band=0.02):
     n = len(records)
     grey = []
+    seen = set()
     for i in range(n):
         for j in range(i + 1, n):
             s = score_matrix[i, j]
             if abs(s - threshold) <= band:
-                grey.append((i, j, s))
+                key = tuple(sorted([
+                    records[i]["text"].strip().lower(),
+                    records[j]["text"].strip().lower()
+                ]))
+                if key not in seen:
+                    seen.add(key)
+                    grey.append((i, j, s))
     return grey
 
 
@@ -376,24 +380,30 @@ def run_pipeline():
             print(f"\nScore: {score:.3f}")
             print(f"  [{ra['language']}] {ra['text']}")
             print(f"  [{rb['language']}] {rb['text']}")
-    from gemini_arbiter import run_arbitration, UnionFind as ArbiterUF
 
-    n = len(records)
-    uf = ArbiterUF(n)
-    for i in range(n):
-        for j in range(i + 1, n):
-            if combined_matrix[i, j] >= THRESHOLD:
-                uf.union(i, j)
-
-    updated_clusters, decisions = run_arbitration(
-        grey_zone_pairs=grey_zone,
-        records=records,
-        uf=uf,
-        threshold=THRESHOLD,
-        save_path=Path(__file__).parent / "arbiter_results.json",
-    )
-    clusters = updated_clusters  # swap in arbiter-refined result
-
+    try:
+        from gemini_arbiter import run_arbitration, UnionFind as ArbiterUF
+        import os
+        print(f"\n  OPENAI_API_KEY: {'SET' if os.getenv('OPENAI_API_KEY') else 'MISSING'}")
+        n = len(records)
+        uf = ArbiterUF(n)
+        for i in range(n):
+            for j in range(i + 1, n):
+                if combined_matrix[i, j] >= THRESHOLD:
+                    uf.union(i, j)
+        updated_clusters, decisions = run_arbitration(
+            grey_zone_pairs=grey_zone,
+            records=records,
+            uf=uf,
+            threshold=THRESHOLD,
+            save_path=Path(__file__).parent / "arbiter_results.json",
+        )
+        clusters = updated_clusters
+    except Exception as e:
+        print(f"\n  [!] Arbiter skipped: {e}")
+        import traceback
+        traceback.print_exc()
+        print("      Pipeline continuing with embedding-only clusters.")
     print("\n" + "=" * 60)
     return clusters, metrics, combined_matrix
 

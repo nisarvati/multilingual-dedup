@@ -265,14 +265,14 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
         clusters_ids = cluster_duplicates(records, combined_matrix, threshold)
         grey_zone = find_grey_zone_pairs(records, combined_matrix, threshold)
 
-        # ---- Stage 6: Arbiter ----
-        update_job(job_id, stage="Running Gemini arbitration...", progress=75)
+       # ---- Stage 6: Arbiter ----
+        update_job(job_id, stage="Running LLM arbitration...", progress=75)
         arbiter_decisions = []
         try:
             from gemini_arbiter import run_arbitration, UnionFind as ArbiterUF
-            gemini_key = os.getenv("GEMINI_API_KEY")
-            if not gemini_key:
-                raise ValueError("No GEMINI_API_KEY set — skipping arbiter.")
+            openai_key = os.getenv("OPENAI_API_KEY")
+            if not openai_key:
+                raise ValueError("No OPENAI_API_KEY set — skipping arbiter.")
 
             n = len(records)
             uf = ArbiterUF(n)
@@ -303,6 +303,7 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
             ]
         except Exception as e:
             print(f"[arbiter] Skipped: {e}")
+            traceback.print_exc()
             update_job(job_id, stage="Arbiter skipped — clustering complete...")
 
         # ---- Stage 7: Build response payload ----
