@@ -6,9 +6,9 @@
     "text_b": "ไนกี้ แอร์แม็กซ์ 90 ใหม่",
     "similarity_score": 0.76012964285337,
     "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "confidence": 0.85,
+    "reasoning": "The records refer to different models of Nike shoes, with Record A being Air Max 95 and Record B being Air Max 90.",
+    "abstained": false
   },
   {
     "index_a": 329,
@@ -16,10 +16,10 @@
     "text_a": "شركة جوجل جديد",
     "text_b": "グーグル 新品",
     "similarity_score": 0.7603839136872973,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "Both records refer to Google in different languages, indicating they are the same entity.",
+    "abstained": false
   },
   {
     "index_a": 86,
@@ -28,9 +28,9 @@
     "text_b": "赤いんりご",
     "similarity_score": 0.7595920643636158,
     "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "confidence": 0.8,
+    "reasoning": "The records contain a typo in Record B, making them refer to different entities.",
+    "abstained": false
   },
   {
     "index_a": 50,
@@ -38,10 +38,10 @@
     "text_a": "شركة مايكروسوفت",
     "text_b": "บริษัท ไมโครซอฟท์ ",
     "similarity_score": 0.7604889523983,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.95,
+    "reasoning": "Both records refer to Microsoft in Arabic and Thai, respectively, indicating they are the same entity.",
+    "abstained": false
   },
   {
     "index_a": 50,
@@ -49,10 +49,10 @@
     "text_a": "شركة مايكروسوفت",
     "text_b": "บริษัท ไมโครซอฟท์",
     "similarity_score": 0.7604889523983,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.95,
+    "reasoning": "Both records refer to Microsoft in Arabic and Thai, respectively, indicating they are the same entity despite language differences.",
+    "abstained": false
   },
   {
     "index_a": 76,
@@ -60,10 +60,10 @@
     "text_a": "บริษัท ไมโครซอฟท์ ",
     "text_b": "شركة مايكروسوفت",
     "similarity_score": 0.7604889523983,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.95,
+    "reasoning": "Both records refer to Microsoft in different languages, indicating they are the same entity.",
+    "abstained": false
   },
   {
     "index_a": 124,
@@ -71,10 +71,10 @@
     "text_a": "شركة مايكروسوفت",
     "text_b": "บริษัท ไมโครซอฟท์",
     "similarity_score": 0.7604889523983,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.95,
+    "reasoning": "Both records refer to Microsoft in different languages, indicating they are the same entity.",
+    "abstained": false
   },
   {
     "index_a": 48,
@@ -82,10 +82,10 @@
     "text_a": "サムスン ギャラクシー S24",
     "text_b": "सैमसंग गैलेक्सी S24",
     "similarity_score": 0.759482624460669,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "The records refer to the same product, Samsung Galaxy S24, in different languages.",
+    "abstained": false
   },
   {
     "index_a": 48,
@@ -93,10 +93,10 @@
     "text_a": "サムスン ギャラクシー S24",
     "text_b": "सैमसंग गैलेक्सी S24",
     "similarity_score": 0.759482624460669,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "Both records refer to the same product, the Samsung Galaxy S24, in different languages.",
+    "abstained": false
   },
   {
     "index_a": 300,
@@ -104,10 +104,10 @@
     "text_a": "सैमसंग गैलेक्सी S24",
     "text_b": "サムスン ギャラクシー S24",
     "similarity_score": 0.759482624460669,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "The records refer to the same product, Samsung Galaxy S24, in different languages.",
+    "abstained": false
   },
   {
     "index_a": 330,
@@ -115,10 +115,10 @@
     "text_a": "サムスン ギャラクシー S24",
     "text_b": "सैमसंग गैलेक्सी S24",
     "similarity_score": 0.759482624460669,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "Both records refer to the same product, the Samsung Galaxy S24, in different languages.",
+    "abstained": false
   },
   {
     "index_a": 32,
@@ -126,10 +126,10 @@
     "text_a": "巧克力棒",
     "text_b": "초콜릿 바",
     "similarity_score": 0.759354350566864,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "Both records refer to the same product, chocolate bars, in different languages.",
+    "abstained": false
   },
   {
     "index_a": 32,
@@ -137,10 +137,10 @@
     "text_a": "巧克力棒",
     "text_b": "초콜릿 바",
     "similarity_score": 0.759354350566864,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.85,
+    "reasoning": "Both records refer to the same product, chocolate bars, in different languages.",
+    "abstained": false
   },
   {
     "index_a": 46,
@@ -148,10 +148,10 @@
     "text_a": "초콜릿 바",
     "text_b": "巧克力棒",
     "similarity_score": 0.759354350566864,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "Both records refer to the same product, chocolate bar, in different languages.",
+    "abstained": false
   },
   {
     "index_a": 284,
@@ -159,9 +159,9 @@
     "text_a": "초콜릿 바",
     "text_b": "巧克力棒",
     "similarity_score": 0.759354350566864,
-    "is_duplicate": false,
-    "confidence": 0.0,
-    "reasoning": "Abstained — API error or unparseable response.",
-    "abstained": true
+    "is_duplicate": true,
+    "confidence": 0.9,
+    "reasoning": "Both records refer to the same product, chocolate bar, in different languages.",
+    "abstained": false
   }
 ]
