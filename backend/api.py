@@ -14,7 +14,7 @@ Design decisions:
     - Jobs run in a background thread so /run returns immediately
     - Progress is stored in-memory (dict) and polled via /status
     - Column mapping: user picks any CSV column → pipeline sees it as "text"
-    - Arbiter is optional: skipped gracefully if GEMINI_API_KEY missing or quota hit
+    - Arbiter is optional: skipped gracefully if OPENAI_API_KEY missing or quota hit
     - No DB: job store is in-memory, fine for demo/hackathon scope
 """
 
@@ -269,7 +269,7 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
         update_job(job_id, stage="Running LLM arbitration...", progress=75)
         arbiter_decisions = []
         try:
-            from gemini_arbiter import run_arbitration, UnionFind as ArbiterUF
+            from llm_arbiter import run_arbitration, UnionFind as ArbiterUF
             openai_key = os.getenv("OPENAI_API_KEY")
             if not openai_key:
                 raise ValueError("No OPENAI_API_KEY set — skipping arbiter.")

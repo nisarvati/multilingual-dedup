@@ -24,7 +24,7 @@ load_dotenv()
 # CONFIG
 # ============================================================
 
-MODEL_NAME       = "gpt-4o-mini"
+MODEL_NAME       = "gpt-4.1-nano"
 MAX_RETRIES      = 3
 RETRY_DELAY      = 2.0
 BATCH_DELAY      = 0.3
@@ -150,7 +150,7 @@ Are these the same real-world entity?"""
 # ARBITER CLIENT
 # ============================================================
 
-class GeminiArbiter:
+class LLMArbiter:
     def __init__(self, api_key: Optional[str] = None, top_n: int = TOP_N_AMBIGUOUS):
         key = api_key or os.getenv("OPENAI_API_KEY")
         if not key:
@@ -226,7 +226,7 @@ class GeminiArbiter:
         selected = ranked[:self.top_n]
 
         print(f"\n{'='*60}")
-        print(f"GEMINI ARBITER")
+        print(f"LLM ARBITER")
         print(f"{'='*60}")
         print(f"  Grey zone pairs total : {len(grey_zone_pairs)}")
         print(f"  Sending top {self.top_n} most ambiguous to {MODEL_NAME}")
@@ -309,7 +309,7 @@ def run_arbitration(
     top_n: int = TOP_N_AMBIGUOUS,
     save_path: Optional[Path] = None,
 ) -> Tuple[List[List[str]], List[ArbiterDecision]]:
-    arbiter = GeminiArbiter(api_key=api_key, top_n=top_n)
+    arbiter = LLMArbiter(api_key=api_key, top_n=top_n)
     decisions, updated_uf = arbiter.run(grey_zone_pairs, records, uf, threshold)
     if save_path:
         save_decisions(decisions, save_path)

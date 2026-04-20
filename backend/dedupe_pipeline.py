@@ -382,7 +382,7 @@ def run_pipeline():
             print(f"  [{rb['language']}] {rb['text']}")
 
     try:
-        from gemini_arbiter import run_arbitration, UnionFind as ArbiterUF
+        from llm_arbiter import run_arbitration, UnionFind as ArbiterUF
         import os
         print(f"\n  OPENAI_API_KEY: {'SET' if os.getenv('OPENAI_API_KEY') else 'MISSING'}")
         n = len(records)
