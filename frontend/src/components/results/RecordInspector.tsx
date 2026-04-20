@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Sparkles, Languages, Hash } from "lucide-react";
-import { api, ExplainResponse, RecordItem } from "@/lib/api";
+import { api, ExplainResponse, RecordItem, estimateRecordSimilarity } from "@/lib/backendApi";
 import { SimilarityBadge } from "./SimilarityBadge";
 import { TokenAttribution } from "@/components/explain/TokenAttribution";
 import { FeedbackButtons } from "@/components/feedback/FeedbackButtons";
@@ -33,12 +33,22 @@ export const RecordInspector = ({ pair }: Props) => {
 
   useEffect(() => {
     if (!pair) return;
+    let alive = true;
     setLoading(true);
     setExplain(null);
-    api.explain(pair.a, pair.b).then((r) => {
-      setExplain(r);
-      setLoading(false);
-    });
+    api
+      .explain(pair.a, pair.b, estimateRecordSimilarity(pair.a, pair.b))
+      .then((r) => {
+        if (!alive) return;
+        setExplain(r);
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
   }, [pair?.a.id, pair?.b.id]);
 
   if (!pair) {

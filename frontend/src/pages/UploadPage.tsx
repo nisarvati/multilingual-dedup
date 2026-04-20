@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles } from "lucide-react";
@@ -7,8 +7,38 @@ import { FileDrop } from "@/components/upload/FileDrop";
 import { ColumnMapper } from "@/components/upload/ColumnMapper";
 import { DatasetPreview } from "@/components/upload/DatasetPreview";
 import { Button } from "@/components/ui/button";
-import { api, UploadResponse } from "@/lib/backendApi";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { api, DomainConfig, UploadResponse } from "@/lib/backendApi";
 import { toast } from "sonner";
+
+const DISPLAY_TO_BACKEND_DOMAIN: Record<string, string> = {
+  "E-commerce / Products": "E-commerce Products",
+  "Company Names": "Company Names",
+  "Person Names": "Person Names",
+  "Medical Records": "Medical Records",
+  Others: "Others",
+};
+
+const DOMAIN_INFO: Record<string, string> = {
+  "E-commerce / Products":
+    "Strict threshold 0.82 — product variants like iPhone 15 vs iPhone 15 Pro will not be merged.",
+  "Company Names":
+    "Lenient threshold 0.74 — legal suffix variations like LLC vs Corporation will be merged.",
+  "Person Names":
+    "Balanced threshold 0.79 — name spelling variations like Mohammed vs Muhammad will be merged.",
+  "Medical Records":
+    "Very strict threshold 0.91 — conservative to avoid dangerous false positives.",
+  Others:
+    "Default threshold 0.82 — same as E-commerce. Adjust using the threshold slider after processing.",
+};
+
+const DOMAIN_OPTIONS = [
+  "E-commerce / Products",
+  "Company Names",
+  "Person Names",
+  "Medical Records",
+  "Others",
+] as const;
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -19,6 +49,36 @@ export default function UploadPage() {
   const [langCol, setLangCol] = useState("");
   const [idCol, setIdCol] = useState("");
   const [running, setRunning] = useState(false);
+  const [domainsLoading, setDomainsLoading] = useState(true);
+  const [domainConfigs, setDomainConfigs] = useState<Record<string, DomainConfig>>({});
+  const [selectedDomain, setSelectedDomain] = useState<(typeof DOMAIN_OPTIONS)[number]>("E-commerce / Products");
+
+  useEffect(() => {
+    let alive = true;
+
+    api
+      .domains()
+      .then((response) => {
+        if (!alive) return;
+        setDomainConfigs(response.configs);
+
+        if (response.default === "Company Names") setSelectedDomain("Company Names");
+        else if (response.default === "Person Names") setSelectedDomain("Person Names");
+        else if (response.default === "Medical Records") setSelectedDomain("Medical Records");
+        else setSelectedDomain("E-commerce / Products");
+      })
+      .catch((error) => {
+        if (!alive) return;
+        toast.error(error instanceof Error ? error.message : "Failed to load domain presets");
+      })
+      .finally(() => {
+        if (alive) setDomainsLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleFile = async (f: File) => {
     setFile(f);
@@ -42,12 +102,14 @@ export default function UploadPage() {
     if (!data) return;
     setRunning(true);
     const threshold = 0.76;
+    const backendDomain = DISPLAY_TO_BACKEND_DOMAIN[selectedDomain];
     try {
       await api.run({
         job_id: data.job_id,
         text_column: textCol,
         language_column: langCol || undefined,
         id_column: idCol || undefined,
+        domain: backendDomain,
         threshold,
       });
       navigate(`/processing?job=${encodeURIComponent(data.job_id)}&threshold=${threshold.toFixed(2)}`);
@@ -77,6 +139,51 @@ export default function UploadPage() {
         </motion.div>
 
         <div className="space-y-6">
+          <div className="rounded-2xl border border-border/60 bg-surface p-5">
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-semibold">Choose a matching domain</div>
+                <p className="mt-1 text-sm text-subtle">
+                  This preset tunes thresholding and score weights before you upload.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                  Domain
+                </label>
+                <Select
+                  value={selectedDomain}
+                  onValueChange={(value) => setSelectedDomain(value as (typeof DOMAIN_OPTIONS)[number])}
+                  disabled={domainsLoading}
+                >
+                  <SelectTrigger className="border-border/70 bg-background/40">
+                    <SelectValue placeholder="Select a domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DOMAIN_OPTIONS.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm">
+                <div className="font-medium text-foreground">
+                  {DOMAIN_INFO[selectedDomain]}
+                </div>
+                <div className="mt-2 text-xs text-subtle">
+                  Backend threshold preset:{" "}
+                  <span className="font-mono text-foreground">
+                    {(domainConfigs[DISPLAY_TO_BACKEND_DOMAIN[selectedDomain] === "Others" ? "E-commerce Products" : DISPLAY_TO_BACKEND_DOMAIN[selectedDomain]]?.threshold ?? 0.82).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <FileDrop onFile={handleFile} loading={loading} fileName={file?.name} />
 
           {data && (

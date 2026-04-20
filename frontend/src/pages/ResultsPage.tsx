@@ -12,7 +12,7 @@ import {
   FileText,
 } from "lucide-react";
 import { AppShell } from "@/components/layout/AppShell";
-import { api, RecordItem, ResultsResponse } from "@/lib/api";
+import { api, ArbiterDecision, RecordItem, ResultsResponse } from "@/lib/backendApi";
 import { DuplicateGroups } from "@/components/results/DuplicateGroups";
 import { RecordInspector } from "@/components/results/RecordInspector";
 import { ArbiterLog } from "@/components/results/ArbiterLog";
@@ -22,6 +22,7 @@ import { SimilarityBadge } from "@/components/results/SimilarityBadge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 
 // ============================================================
@@ -121,6 +122,16 @@ export default function ResultsPage() {
   >();
   const [feedbackSent, setFeedbackSent] = useState<Set<string>>(new Set());
 
+  const getDecisionForPair = (
+    recordA: RecordItem,
+    recordB: RecordItem
+  ): ArbiterDecision | undefined =>
+    data?.arbiter_decisions.find(
+      (decision) =>
+        (decision.text_a === recordA.text && decision.text_b === recordB.text) ||
+        (decision.text_a === recordB.text && decision.text_b === recordA.text)
+    );
+
   // ---- Load results ----
   useEffect(() => {
     api.results(jobId).then((r) => {
@@ -180,17 +191,7 @@ export default function ResultsPage() {
     if (feedbackSent.has(key)) return;
 
     try {
-      const res = await fetch("/api/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          job_id: jobId,
-          record_id_a: recordIdA,
-          record_id_b: recordIdB,
-          is_duplicate: isDuplicate,
-        }),
-      });
-      const result = await res.json();
+      const result = await api.feedback(jobId, recordIdA, recordIdB, isDuplicate);
       setFeedbackSent((prev) => new Set(prev).add(key));
       toast.success(isDuplicate ? "Marked as duplicate" : "Marked as distinct");
       if (result.suggested_threshold) {
@@ -204,12 +205,7 @@ export default function ResultsPage() {
   // ---- Rethreshold handler ----
   const handleRethreshold = async (newThreshold: number) => {
     try {
-      const res = await fetch("/api/rethreshold", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ job_id: jobId, threshold: newThreshold }),
-      });
-      const result = await res.json();
+      const result = await api.rethreshold(jobId, newThreshold);
       // Update clusters in state with rethresholded results
       if (data) {
         setData({
@@ -347,9 +343,7 @@ export default function ResultsPage() {
                     size="sm"
                     variant="outline"
                     className="flex-1 gap-1.5 text-xs"
-                    onClick={() =>
-                      window.open(`/api/export/${jobId}?format=csv`, "_blank")
-                    }
+                    onClick={() => api.exportResults(jobId, "csv")}
                   >
                     <Download className="h-3 w-3" /> CSV
                   </Button>
@@ -357,9 +351,7 @@ export default function ResultsPage() {
                     size="sm"
                     variant="outline"
                     className="flex-1 gap-1.5 text-xs"
-                    onClick={() =>
-                      window.open(`/api/export/${jobId}?format=pdf`, "_blank")
-                    }
+                    onClick={() => api.exportResults(jobId, "pdf")}
                   >
                     <FileText className="h-3 w-3" /> PDF
                   </Button>
@@ -394,9 +386,9 @@ export default function ResultsPage() {
                 </TabsTrigger>
                 <TabsTrigger value="arbiter">
                   Arbiter log
-                  {data && (data.arbiter_decisions?.length ?? 0) > 0 && (
+                  {data && (
                     <span className="ml-2 rounded-full bg-primary/15 px-1.5 text-[10px] text-primary">
-                      {data.arbiter_decisions!.length}
+                      {data.arbiter_decisions.length}
                     </span>
                   )}
                 </TabsTrigger>
@@ -427,6 +419,8 @@ export default function ResultsPage() {
                   >
                     <DuplicateGroups
                       clusters={filteredClusters}
+                      jobId={jobId}
+                      decisions={data.arbiter_decisions}
                       selectedRecordId={pair?.a.id}
                       onInspect={(a, b) => setPair({ a, b })}
                     />
@@ -445,6 +439,7 @@ export default function ResultsPage() {
               {data?.grey_zone_pairs.map((p) => {
                 const feedbackKey = `${p.record_a.id}:${p.record_b.id}`;
                 const alreadySent = feedbackSent.has(feedbackKey);
+                const decision = getDecisionForPair(p.record_a, p.record_b);
                 return (
                   <motion.div
                     key={p.id}
@@ -455,7 +450,58 @@ export default function ResultsPage() {
                   >
                     <div className="mb-3 flex items-center justify-between">
                       <div className="text-xs text-subtle">Pair {p.id}</div>
-                      <SimilarityBadge value={p.similarity} />
+                      <div className="flex items-center gap-2">
+                        <SimilarityBadge value={p.similarity} />
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 gap-1.5 px-2 text-xs"
+                            >
+                              <Sparkles className="h-3.5 w-3.5" />
+                              Reasoning
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-80 border-border/60 bg-surface p-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                                  Pair reasoning
+                                </div>
+                                <SimilarityBadge value={decision?.similarity_score ?? p.similarity} />
+                              </div>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-subtle">Verdict</span>
+                                <span className={decision?.is_duplicate ? "font-medium text-emerald-300" : "font-medium text-foreground"}>
+                                  {decision ? (decision.is_duplicate ? "Duplicate" : "Different") : "Embedding model"}
+                                </span>
+                              </div>
+                              {decision ? (
+                                <>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-subtle">
+                                      <span>Confidence</span>
+                                      <span>{Math.round(decision.confidence * 100)}%</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-background/80">
+                                      <div
+                                        className="h-2 rounded-full bg-primary"
+                                        style={{ width: `${decision.confidence * 100}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <p className="text-xs leading-relaxed text-subtle">{decision.reasoning}</p>
+                                </>
+                              ) : (
+                                <p className="text-xs leading-relaxed text-subtle">
+                                  Decided by embedding model — confidence above threshold.
+                                </p>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </div>
                     <div className="grid gap-2 md:grid-cols-2">
                       <div className="rounded-lg border border-border/60 bg-surface-elevated p-3 text-sm">
@@ -539,10 +585,21 @@ export default function ResultsPage() {
                     possible pairs.
                   </p>
                 </div>
-                <ArbiterLog decisions={data?.arbiter_decisions ?? []} />
+                {!data ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-24 w-full" />
+                  </div>
+                ) : (
+                  <ArbiterLog decisions={data.arbiter_decisions} />
+                )}
               </div>
             </TabsContent>
           </Tabs>
+
+          <div className="mt-6 lg:hidden">
+            <RecordInspector pair={pair} />
+          </div>
         </div>
 
         {/* ======== RIGHT: record inspector ======== */}

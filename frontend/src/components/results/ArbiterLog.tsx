@@ -1,9 +1,9 @@
 // components/results/ArbiterLog.tsx
 
-import type { ArbiterDecision } from "@/lib/backendApi"
+import type { ArbiterDecision } from "@/lib/backendApi";
 
 interface Props {
-  decisions: ArbiterDecision[]
+  decisions: ArbiterDecision[];
 }
 
 export function ArbiterLog({ decisions }: Props) {
@@ -12,7 +12,7 @@ export function ArbiterLog({ decisions }: Props) {
       <div className="text-sm text-gray-500 italic p-4">
         No grey zone pairs found — all decisions were made by the embedding model.
       </div>
-    )
+    );
   }
 
   return (
@@ -72,5 +72,5 @@ export function ArbiterLog({ decisions }: Props) {
         </tbody>
       </table>
     </div>
-  )
+  );
 }

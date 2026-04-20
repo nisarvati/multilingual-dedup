@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -27,29 +27,36 @@ export default function ProcessingConnected() {
   const [stage, setStage] = useState("Queued");
   const [stageKey, setStageKey] = useState("Queued");
   const [error, setError] = useState<string | null>(null);
+  const aliveRef = useRef(true);
+  const timeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    aliveRef.current = true;
+
     if (!jobId) {
       setError("Missing job id. Please upload a CSV first.");
       return;
     }
 
-    let alive = true;
-
     const tick = async () => {
       try {
         const status = await api.status(jobId);
-        if (!alive) return;
+        if (!aliveRef.current) return;
 
         setProgress(status.progress);
         setStage(status.stage);
-        setStageKey(status.stageKey);
+        setStageKey(status.stageKey ?? "Queued");
         setError(status.error ?? null);
 
         if (status.status === "done" || status.progress >= 100) {
+          aliveRef.current = false;
           const nextParams = new URLSearchParams({ job: jobId });
           if (threshold) nextParams.set("threshold", threshold);
-          window.setTimeout(() => navigate(`/results?${nextParams.toString()}`), 500);
+          if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+          timeoutRef.current = window.setTimeout(
+            () => navigate(`/results?${nextParams.toString()}`),
+            500
+          );
           return;
         }
 
@@ -58,20 +65,23 @@ export default function ProcessingConnected() {
           return;
         }
       } catch (err) {
-        if (!alive) return;
+        if (!aliveRef.current) return;
         const message = err instanceof Error ? err.message : "Unable to read pipeline status.";
         setError(message);
         toast.error(message);
         return;
       }
 
-      if (alive) window.setTimeout(tick, 1200);
+      if (aliveRef.current) {
+        timeoutRef.current = window.setTimeout(tick, 1200);
+      }
     };
 
     tick();
 
     return () => {
-      alive = false;
+      aliveRef.current = false;
+      if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
     };
   }, [jobId, navigate, threshold]);
 

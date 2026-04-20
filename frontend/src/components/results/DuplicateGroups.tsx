@@ -1,13 +1,15 @@
-import { Cluster, RecordItem } from "@/lib/api";
+import { ArbiterDecision, Cluster, RecordItem } from "@/lib/backendApi";
 import { ClusterCard } from "./ClusterCard";
 
 interface Props {
   clusters: Cluster[];
+  jobId: string;
+  decisions: ArbiterDecision[];
   selectedRecordId?: string;
   onInspect: (a: RecordItem, b: RecordItem) => void;
 }
 
-export const DuplicateGroups = ({ clusters, selectedRecordId, onInspect }: Props) => {
+export const DuplicateGroups = ({ clusters, jobId, decisions, selectedRecordId, onInspect }: Props) => {
   if (!clusters.length) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-subtle">
@@ -17,8 +19,16 @@ export const DuplicateGroups = ({ clusters, selectedRecordId, onInspect }: Props
   }
   return (
     <div className="space-y-3">
-      {clusters.map((c) => (
-        <ClusterCard key={c.id} cluster={c} selectedRecordId={selectedRecordId} onInspect={onInspect} />
+      {clusters.map((c, index) => (
+        <ClusterCard
+          key={c.id}
+          cluster={c}
+          clusterIndex={Number(c.id.replace(/^\D+/, "")) - 1 || index}
+          jobId={jobId}
+          decisions={decisions}
+          selectedRecordId={selectedRecordId}
+          onInspect={onInspect}
+        />
       ))}
     </div>
   );

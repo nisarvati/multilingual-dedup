@@ -68,9 +68,12 @@ DOMAIN_CONFIG = {
         "cross_script": {"semantic": 0.98, "fuzzy": 0.02},
     },
 }
+DOMAIN_CONFIG["Others"] = DOMAIN_CONFIG["E-commerce Products"]
 DEFAULT_DOMAIN = "E-commerce Products"
 
 def get_domain_config(domain: str) -> dict:
+    if domain == "Others":
+        domain = DEFAULT_DOMAIN
     return DOMAIN_CONFIG.get(domain, DOMAIN_CONFIG[DEFAULT_DOMAIN])
 
 # Disable category enrichment for now - it was causing under-clustering

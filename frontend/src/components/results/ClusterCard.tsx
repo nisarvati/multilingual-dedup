@@ -1,12 +1,18 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronRight, Users } from "lucide-react";
-import { Cluster, RecordItem } from "@/lib/api";
+import { ChevronRight, Eye, Grid2x2, Users } from "lucide-react";
+import { ArbiterDecision, Cluster, RecordItem } from "@/lib/backendApi";
 import { SimilarityBadge } from "./SimilarityBadge";
+import { HeatmapView } from "./HeatmapView";
 import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 
 interface Props {
   cluster: Cluster;
+  clusterIndex: number;
+  jobId: string;
+  decisions: ArbiterDecision[];
   selectedRecordId?: string;
   onInspect: (a: RecordItem, b: RecordItem) => void;
 }
@@ -21,8 +27,29 @@ const langColor = (lang: string) => {
   return map[lang] ?? "bg-muted/40 text-subtle border-border";
 };
 
-export const ClusterCard = ({ cluster, selectedRecordId, onInspect }: Props) => {
+function getDecision(
+  decisions: ArbiterDecision[],
+  a: RecordItem,
+  b: RecordItem
+): ArbiterDecision | undefined {
+  return decisions.find(
+    (decision) =>
+      (decision.text_a === a.text && decision.text_b === b.text) ||
+      (decision.text_a === b.text && decision.text_b === a.text)
+  );
+}
+
+export const ClusterCard = ({
+  cluster,
+  clusterIndex,
+  jobId,
+  decisions,
+  selectedRecordId,
+  onInspect,
+}: Props) => {
   const [open, setOpen] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+
   return (
     <motion.div
       layout
@@ -59,17 +86,46 @@ export const ClusterCard = ({ cluster, selectedRecordId, onInspect }: Props) => 
             transition={{ duration: 0.2 }}
             className="border-t border-border/60"
           >
+            <li className="flex items-center justify-end border-b border-border/60 px-5 py-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2 text-xs"
+                onClick={() => setShowHeatmap((value) => !value)}
+              >
+                <Grid2x2 className="h-3.5 w-3.5" />
+                {showHeatmap ? "Hide similarity heatmap" : "Show similarity heatmap"}
+              </Button>
+            </li>
+
+            {showHeatmap && (
+              <li className="border-b border-border/60 px-5 py-4">
+                <HeatmapView
+                  jobId={jobId}
+                  clusterIndex={clusterIndex}
+                  onCellClick={(recordA, recordB) => onInspect(recordA, recordB)}
+                />
+              </li>
+            )}
+
             {cluster.records.map((r, i) => {
               const compareTo = cluster.records[(i + 1) % cluster.records.length];
               const active = r.id === selectedRecordId;
+              const decision = getDecision(decisions, r, compareTo);
               return (
-                <li key={r.id}>
+                <li
+                  key={r.id}
+                  className={cn(
+                    "group flex items-start gap-3 px-5 py-3 transition-colors hover:bg-surface-elevated",
+                    active && "bg-primary/5"
+                  )}
+                >
                   <button
+                    type="button"
                     onClick={() => onInspect(r, compareTo)}
                     className={cn(
-                      "group flex w-full items-start gap-3 px-5 py-3 text-left transition-colors",
-                      "hover:bg-surface-elevated",
-                      active && "bg-primary/5"
+                      "flex min-w-0 flex-1 items-start gap-3 text-left"
                     )}
                   >
                     <span
@@ -85,6 +141,65 @@ export const ClusterCard = ({ cluster, selectedRecordId, onInspect }: Props) => 
                     </span>
                     <span className="text-[10px] font-mono text-muted-foreground">{r.id}</span>
                   </button>
+
+                  {cluster.records.length > 1 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[10px] text-subtle transition-colors hover:bg-background hover:text-foreground"
+                        >
+                          <Eye className="h-3 w-3" />
+                          Reasoning
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-80 border-border/60 bg-surface p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                              Pair reasoning
+                            </div>
+                            <SimilarityBadge value={decision?.similarity_score ?? cluster.similarity} />
+                          </div>
+                          <div className="space-y-1 text-xs text-subtle">
+                            <div className="rounded-lg border border-border/60 bg-background/40 p-2">
+                              A: {r.text}
+                            </div>
+                            <div className="rounded-lg border border-border/60 bg-background/40 p-2">
+                              B: {compareTo.text}
+                            </div>
+                          </div>
+                          {decision ? (
+                            <>
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-subtle">Verdict</span>
+                                <span className={decision.is_duplicate ? "font-medium text-emerald-300" : "font-medium text-rose-300"}>
+                                  {decision.is_duplicate ? "Duplicate" : "Different"}
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-xs text-subtle">
+                                  <span>Confidence</span>
+                                  <span>{Math.round(decision.confidence * 100)}%</span>
+                                </div>
+                                <div className="h-2 rounded-full bg-background/80">
+                                  <div
+                                    className="h-2 rounded-full bg-primary"
+                                    style={{ width: `${decision.confidence * 100}%` }}
+                                  />
+                                </div>
+                              </div>
+                              <p className="text-xs leading-relaxed text-subtle">{decision.reasoning}</p>
+                            </>
+                          ) : (
+                            <p className="text-xs leading-relaxed text-subtle">
+                              Decided by embedding model — confidence above threshold.
+                            </p>
+                          )}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </li>
               );
             })}

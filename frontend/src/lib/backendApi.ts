@@ -43,6 +43,12 @@ interface BackendResultsResponse {
   language_breakdown?: Record<string, { clustered: number; unique: number }> | null;
 }
 
+interface BackendHeatmapResponse {
+  records: BackendRecord[];
+  matrix: number[][];
+  threshold: number;
+}
+
 interface BackendExplainToken {
   token: string;
   score: number;
@@ -77,6 +83,13 @@ export interface UploadResponse {
   row_count: number;
   preview: Record<string, string>[];
   warnings?: string[];
+}
+
+export interface HeatmapResponse {
+  cluster_index: number;
+  records: { id: string; text: string; language: string }[];
+  matrix: number[][];
+  threshold: number;
 }
 
 export interface RunBody {
@@ -155,6 +168,25 @@ export interface ExplainResponse {
   rationale: string;
 }
 
+export interface HeatmapResponse {
+  records: RecordItem[];
+  matrix: number[][];
+  threshold: number;
+}
+
+export interface DomainConfig {
+  threshold: number;
+  grey_zone: number;
+  same_script: {
+    semantic: number;
+    fuzzy: number;
+  };
+  cross_script: {
+    semantic: number;
+    fuzzy: number;
+  };
+}
+
 // ============================================================
 // REQUEST HELPER
 // ============================================================
@@ -198,8 +230,8 @@ async function request<T>(
 // HELPERS
 // ============================================================
 
-function normalizeStage(stage: string): StageKey {
-  const v = stage.toLowerCase();
+function normalizeStage(stage?: string | null): StageKey {
+  const v = stage?.toLowerCase() ?? "";
   if (v.includes("error")) return "Error";
   if (v.includes("complete")) return "Complete";
   if (v.includes("queue")) return "Queued";
@@ -281,7 +313,7 @@ export const api = {
       status: res.status,
       progress: res.progress,
       stage: res.stage,
-      stageKey: normalizeStage(res.stage),
+      stageKey: normalizeStage(res.stage) ?? "Queued",
       error: res.error,
     };
   },
@@ -324,10 +356,24 @@ export const api = {
     };
   },
 
+  async heatmap(jobId: string, clusterIndex: number): Promise<HeatmapResponse> {
+    const res = await request<BackendHeatmapResponse>(
+      `/heatmap/${jobId}/${clusterIndex}`,
+      undefined,
+      20000
+    );
+
+    return {
+      records: res.records.map(normalizeRecord),
+      matrix: res.matrix,
+      threshold: res.threshold,
+    };
+  },
+
   async explain(
     a: RecordItem,
     b: RecordItem,
-    similarity: number
+    similarity?: number
   ): Promise<ExplainResponse> {
     const res = await request<BackendExplainResponse>(
       "/explain",
@@ -339,7 +385,7 @@ export const api = {
           text_b: b.text,
           language_a: a.language,
           language_b: b.language,
-          semantic_score: similarity,
+          semantic_score: similarity ?? estimateRecordSimilarity(a, b),
         }),
       },
       20000
@@ -396,7 +442,7 @@ export const api = {
   async domains(): Promise<{
     domains: string[];
     default: string;
-    configs: Record<string, any>;
+    configs: Record<string, DomainConfig>;
   }> {
     return request("/domains", undefined, 5000);
   },
