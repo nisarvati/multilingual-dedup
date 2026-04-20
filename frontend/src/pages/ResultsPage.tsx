@@ -9,6 +9,7 @@ import {
   Layers,
   Sparkles,
   Target,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ import { ThresholdSlider } from "@/components/controls/ThresholdSlider";
 import { ArbiterLog } from "@/components/results/ArbiterLog";
 import { DuplicateGroups } from "@/components/results/DuplicateGroups";
 import { RecordInspector } from "@/components/results/RecordInspector";
+import { HeatmapView } from "@/components/results/HeatmapView";
 import { SimilarityBadge } from "@/components/results/SimilarityBadge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -115,6 +117,8 @@ function LanguagePills({
 }
 
 export default function ResultsPage() {
+  type HeatmapModalState = { clusterIndex: number; clusterId: string };
+
   const [params] = useSearchParams();
   const jobId = params.get("job") ?? "demo";
 
@@ -122,15 +126,13 @@ export default function ResultsPage() {
   const [threshold, setThreshold] = useState(0.76);
   const [sortBy, setSortBy] = useState<SortOption>("similarity");
   const [pair, setPair] = useState<{ a: RecordItem; b: RecordItem; similarity?: number } | undefined>();
+  const [heatmapModal, setHeatmapModal] = useState<HeatmapModalState | undefined>();
   const [feedbackByPair, setFeedbackByPair] = useState<Record<string, FeedbackState>>({});
 
   useEffect(() => {
     api.results(jobId).then((result) => {
       setData(result);
       setThreshold(result.threshold_used ?? 0.76);
-      if (result.clusters[0] && result.clusters[0].records.length >= 2) {
-        setPair({ a: result.clusters[0].records[0], b: result.clusters[0].records[1] });
-      }
     });
   }, [jobId]);
 
@@ -204,6 +206,21 @@ export default function ResultsPage() {
     : data.arbiter_status === "skipped"
       ? data.arbiter_message ?? "Arbiter did not run for this job."
       : `${data.arbiter_decisions.length} grey-zone pairs reviewed`;
+
+  const closeModals = () => {
+    setPair(undefined);
+    setHeatmapModal(undefined);
+  };
+
+  const openInspector = (a: RecordItem, b: RecordItem, similarity?: number) => {
+    setHeatmapModal(undefined);
+    setPair({ a, b, similarity });
+  };
+
+  const openHeatmap = (clusterIndex: number, clusterId: string) => {
+    setPair(undefined);
+    setHeatmapModal({ clusterIndex, clusterId });
+  };
 
   return (
     <AppShell subtitle="Results dashboard">
@@ -335,7 +352,8 @@ export default function ResultsPage() {
                           jobId={jobId}
                           decisions={data.arbiter_decisions}
                           selectedRecordId={pair?.a.id}
-                          onInspect={(a, b, similarity) => setPair({ a, b, similarity })}
+                          onInspect={openInspector}
+                          onOpenHeatmap={openHeatmap}
                         />
                       </motion.div>
                     )}
@@ -432,7 +450,7 @@ export default function ResultsPage() {
                             size="sm"
                             variant="ghost"
                             className="text-subtle hover:text-foreground"
-                            onClick={() => setPair({ a: greyPair.record_a, b: greyPair.record_b, similarity: greyPair.similarity })}
+                            onClick={() => openInspector(greyPair.record_a, greyPair.record_b, greyPair.similarity)}
                           >
                             Inspect {"->"}
                           </Button>
@@ -485,17 +503,86 @@ export default function ResultsPage() {
             </div>
           </div>
 
-          <div className="min-h-0 self-start lg:sticky lg:top-20">
-            <RecordInspector
-              pair={pair}
-              feedbackState={currentPairKey ? feedbackByPair[currentPairKey] : undefined}
-              onFeedback={(value) => {
-                if (!pair) return;
-                handleFeedback(pair.a, pair.b, value);
-              }}
-            />
-          </div>
         </div>
+
+        <AnimatePresence>
+          {pair && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+              onClick={closeModals}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative max-h-[90vh] w-full max-w-5xl"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="absolute right-3 top-3 z-10 h-8 w-8 rounded-full bg-background/90"
+                  onClick={closeModals}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <RecordInspector
+                  pair={pair}
+                  feedbackState={currentPairKey ? feedbackByPair[currentPairKey] : undefined}
+                  onFeedback={(value) => {
+                    if (!pair) return;
+                    handleFeedback(pair.a, pair.b, value);
+                  }}
+                />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {heatmapModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+              onClick={closeModals}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-2xl border border-border/60 bg-surface"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="absolute right-3 top-3 z-10 h-8 w-8 rounded-full bg-background/90"
+                  onClick={closeModals}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <div className="border-b border-border/60 px-5 py-4">
+                  <div className="text-sm font-medium">Similarity heatmap</div>
+                  <div className="text-xs text-subtle">{heatmapModal.clusterId}</div>
+                </div>
+                <div className="max-h-[calc(90vh-73px)] overflow-auto p-5 scrollbar-thin">
+                  <HeatmapView
+                    jobId={jobId}
+                    clusterIndex={heatmapModal.clusterIndex}
+                    onCellClick={openInspector}
+                  />
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </AppShell>
   );

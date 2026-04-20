@@ -7,9 +7,17 @@ interface Props {
   decisions: ArbiterDecision[];
   selectedRecordId?: string;
   onInspect: (a: RecordItem, b: RecordItem, similarity?: number) => void;
+  onOpenHeatmap: (clusterIndex: number, clusterId: string) => void;
 }
 
-export const DuplicateGroups = ({ clusters, jobId, decisions, selectedRecordId, onInspect }: Props) => {
+export const DuplicateGroups = ({
+  clusters,
+  jobId,
+  decisions,
+  selectedRecordId,
+  onInspect,
+  onOpenHeatmap,
+}: Props) => {
   if (!clusters.length) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-subtle">
@@ -28,6 +36,7 @@ export const DuplicateGroups = ({ clusters, jobId, decisions, selectedRecordId, 
           decisions={decisions}
           selectedRecordId={selectedRecordId}
           onInspect={onInspect}
+          onOpenHeatmap={onOpenHeatmap}
         />
       ))}
     </div>

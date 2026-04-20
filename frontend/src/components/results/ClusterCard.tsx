@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Eye, Grid2x2, Users } from "lucide-react";
 import { ArbiterDecision, Cluster, RecordItem } from "@/lib/backendApi";
 import { SimilarityBadge } from "./SimilarityBadge";
-import { HeatmapView } from "./HeatmapView";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ interface Props {
   decisions: ArbiterDecision[];
   selectedRecordId?: string;
   onInspect: (a: RecordItem, b: RecordItem, similarity?: number) => void;
+  onOpenHeatmap: (clusterIndex: number, clusterId: string) => void;
 }
 
 const langColor = (lang: string) => {
@@ -46,9 +46,9 @@ export const ClusterCard = ({
   decisions,
   selectedRecordId,
   onInspect,
+  onOpenHeatmap,
 }: Props) => {
   const [open, setOpen] = useState(false);
-  const [showHeatmap, setShowHeatmap] = useState(false);
 
   return (
     <motion.div
@@ -93,23 +93,12 @@ export const ClusterCard = ({
                 size="sm"
                 variant="outline"
                 className="gap-2 text-xs"
-                onClick={() => setShowHeatmap((value) => !value)}
+                onClick={() => onOpenHeatmap(clusterIndex, cluster.id)}
               >
                 <Grid2x2 className="h-3.5 w-3.5" />
-                {showHeatmap ? "Hide similarity heatmap" : "Show similarity heatmap"}
+                Show similarity heatmap
               </Button>
             </li>
-
-            {showHeatmap && (
-              <li className="border-b border-border/60 px-5 py-4">
-                <HeatmapView
-                  jobId={jobId}
-                  clusterIndex={clusterIndex}
-                  onCellClick={(recordA, recordB) => onInspect(recordA, recordB, cluster.similarity)}
-
-                />
-              </li>
-            )}
 
             <li>
               <ul className="max-h-[18rem] overflow-y-auto">

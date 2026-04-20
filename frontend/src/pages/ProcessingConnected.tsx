@@ -95,7 +95,8 @@ export default function ProcessingConnected() {
         >
           <div className="space-y-2">
             <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-              Job · <span className="font-mono tracking-normal">{jobId || "Unavailable"}</span>
+              Job  
+              {/* <span className="font-mono tracking-normal">{jobId || "Unavailable"}</span> */}
             </div>
             <h1 className="text-3xl font-semibold tracking-tight">Processing your dedup run</h1>
             <p className="max-w-2xl text-sm text-subtle">
