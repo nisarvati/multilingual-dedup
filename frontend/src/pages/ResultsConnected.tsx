@@ -202,8 +202,14 @@ export default function ResultsConnected() {
           </div>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => navigate("/")}>
-              Upload another CSV
-            </Button>
+  Upload another CSV
+</Button>
+<Button variant="outline" onClick={() => api.exportResults(jobId, "csv")}>
+  Download CSV
+</Button>
+<Button variant="outline" onClick={() => api.exportResults(jobId, "pdf")}>
+  Download PDF Report
+</Button>
           </div>
         </div>
 
