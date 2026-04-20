@@ -71,14 +71,14 @@ const StatCard = ({
   value: string;
   hint?: string;
 }) => (
-  <div className="rounded-2xl border border-border/60 bg-surface p-4">
-    <div className="flex items-center justify-between">
-      <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
-      <Icon className="h-4 w-4 text-primary" />
-    </div>
-    <div className="mt-2 font-mono text-2xl tabular-nums">{value}</div>
-    {hint && <div className="mt-0.5 text-[11px] text-subtle">{hint}</div>}
+  <div className="rounded-xl border border-border/60 bg-surface px-4 py-3">
+  <div className="flex items-center justify-between">
+    <span className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</span>
+    <Icon className="h-4 w-4 text-primary" />
   </div>
+  <div className="mt-1.5 font-mono text-2xl tabular-nums">{value}</div>
+  {hint && <div className="mt-0.5 text-[11px] text-subtle">{hint}</div>}
+</div>
 );
 
 function LanguagePills({
@@ -128,6 +128,17 @@ export default function ResultsPage() {
   const [pair, setPair] = useState<{ a: RecordItem; b: RecordItem; similarity?: number } | undefined>();
   const [heatmapModal, setHeatmapModal] = useState<HeatmapModalState | undefined>();
   const [feedbackByPair, setFeedbackByPair] = useState<Record<string, FeedbackState>>({});
+
+  useEffect(() => {
+    if (pair || heatmapModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [pair, heatmapModal]);
 
   useEffect(() => {
     api.results(jobId).then((result) => {
@@ -225,7 +236,7 @@ export default function ResultsPage() {
   return (
     <AppShell subtitle="Results dashboard">
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div className="border-b border-border/60 bg-background/40 px-6 py-3">
+        <div className="border-b border-border/60 bg-background/40 px-6 py-2">
           {!data ? (
             <div className="grid gap-3 lg:grid-cols-5">
               {Array.from({ length: 5 }).map((_, index) => (
@@ -240,8 +251,8 @@ export default function ResultsPage() {
                     Job
                     {/* <span className="font-mono tracking-normal">{jobId}</span> */}
                   </div>
-                  <h1 className="mt-1 text-2xl font-semibold tracking-tight">Overview</h1>
-                  <p className="mt-1 max-w-3xl text-sm text-subtle">
+                  <h1 className="mt-0.5 text-xl font-semibold tracking-tight">Overview</h1>
+                    <p className="mt-0.5 max-w-3xl text-xs text-subtle">
                     Live thresholding, sorted duplicate groups, and inspector-based review.
                   </p>
                 </div>
@@ -255,7 +266,7 @@ export default function ResultsPage() {
                 </div>
               </div>
 
-              <div className="grid gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(320px,1.1fr)]">
+              <div className="grid gap-2 xl:grid-cols-[repeat(4,minmax(0,1fr))_minmax(280px,1fr)]">
                 <StatCard icon={Database} label="Records" value={data.total_records.toLocaleString()} />
                 <StatCard icon={Layers} label="Clusters" value={String(data.total_clusters)} />
                 <StatCard
@@ -270,7 +281,7 @@ export default function ResultsPage() {
                   value={data.metrics?.f1 != null ? data.metrics.f1.toFixed(3) : "--"}
                   hint={data.domain ? `Domain: ${data.domain}` : undefined}
                 />
-                <div className="rounded-2xl border border-border/60 bg-surface p-4">
+                <div className="rounded-2xl border border-border/60 bg-surface p-3">
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -289,14 +300,27 @@ export default function ResultsPage() {
               </div>
 
               {data.language_breakdown && Object.keys(data.language_breakdown).length > 0 && (
-                <LanguagePills breakdown={data.language_breakdown} />
+                <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border/60 bg-surface px-4 py-2">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground mr-1">Languages</span>
+                  {Object.entries(data.language_breakdown)
+                    .sort((a, b) => (b[1].clustered + b[1].unique) - (a[1].clustered + a[1].unique))
+                    .map(([lang, counts]) => {
+                      const total = Object.values(data.language_breakdown!).reduce((s, v) => s + v.clustered + v.unique, 0);
+                      const pct = Math.round(((counts.clustered + counts.unique) / total) * 100);
+                      return (
+                        <span key={lang} className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                          {LANG_LABELS[lang] || lang.toUpperCase()} {pct}%
+                        </span>
+                      );
+                    })}
+                </div>
               )}
             </div>
           )}
         </div>
 
-        <div className="grid gap-6 px-6 py-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(360px,0.9fr)]">
-          <div className="min-h-0 rounded-2xl border border-border/60 bg-surface">
+        <div className="flex justify-center px-6 py-5">
+          <div className="min-h-0 w-full max-w-5xl rounded-2xl border border-border/60 bg-surface">
             <div className="flex items-center justify-between border-b border-border/60 px-5 py-4">
               <div>
                 <div className="text-xl font-semibold tracking-tight">Duplicate intelligence</div>
