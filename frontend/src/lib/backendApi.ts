@@ -45,6 +45,7 @@ interface BackendResultsResponse {
   arbiter_message?: string | null;
   arbiter_results?: ArbiterDecision[] | null;
   decisions?: ArbiterDecision[] | null;
+  used_faiss?: boolean | null;
 }
 
 interface BackendHeatmapResponse {
@@ -97,6 +98,8 @@ export interface RunBody {
   domain?: string;
   threshold?: number;
   top_n_arbiter?: number;
+  use_faiss?: boolean | null;  
+  faiss_top_k?: number;   
 }
 
 export type StageKey =
@@ -158,6 +161,7 @@ export interface ResultsResponse {
   language_breakdown?: Record<string, { clustered: number; unique: number }>;
   arbiter_status?: "skipped" | "done";
   arbiter_message?: string;
+  used_faiss?: boolean;
 }
 
 export interface ExplainResponse {
@@ -356,6 +360,7 @@ export const api = {
       language_breakdown: res.language_breakdown ?? undefined,
       arbiter_status: res.arbiter_status === "skipped" ? "skipped" : res.arbiter_status === "done" ? "done" : undefined,
       arbiter_message: res.arbiter_message ?? undefined,
+      used_faiss: res.used_faiss ?? false,
     };
   },
 

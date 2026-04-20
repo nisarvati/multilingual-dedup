@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { api, DomainConfig, UploadResponse } from "@/lib/backendApi";
 import { toast } from "sonner";
 
+
 const DISPLAY_TO_BACKEND_DOMAIN: Record<string, string> = {
   "E-commerce / Products": "E-commerce Products",
   "Company Names": "Company Names",
@@ -52,6 +53,7 @@ export default function UploadPage() {
   const [domainsLoading, setDomainsLoading] = useState(true);
   const [domainConfigs, setDomainConfigs] = useState<Record<string, DomainConfig>>({});
   const [selectedDomain, setSelectedDomain] = useState<(typeof DOMAIN_OPTIONS)[number]>("E-commerce / Products");
+  const [processingMode, setProcessingMode] = useState<"auto" | "exact" | "faiss">("auto");
 
   useEffect(() => {
     let alive = true;
@@ -111,6 +113,7 @@ export default function UploadPage() {
         id_column: idCol || undefined,
         domain: backendDomain,
         threshold,
+        use_faiss: processingMode === "auto" ? null : processingMode === "faiss",  
       });
       navigate(`/processing?job=${encodeURIComponent(data.job_id)}&threshold=${threshold.toFixed(2)}`);
     } catch (error) {
@@ -183,7 +186,49 @@ export default function UploadPage() {
               </div>
             </div>
           </div>
-
+          <div className="rounded-2xl border border-border/60 bg-surface p-5">
+  <div className="space-y-3">
+    <div>
+      <div className="text-sm font-semibold">Processing mode</div>
+      <p className="mt-1 text-sm text-subtle">
+        Choose how similarity is computed across your records.
+      </p>
+    </div>
+    <div className="grid grid-cols-3 gap-2">
+      {[
+        { value: "auto", label: "Auto", desc: "FAISS for 1000+ records, exact otherwise" },
+        { value: "exact", label: "Exact", desc: "Compare all pairs — slower, maximum accuracy" },
+        { value: "faiss", label: "FAISS", desc: "Approximate search — up to 100× faster" },
+      ].map((mode) => (
+        <button
+          key={mode.value}
+          type="button"
+          onClick={() => setProcessingMode(mode.value as "auto" | "exact" | "faiss")}
+          className={`rounded-xl border p-3 text-left transition-colors ${
+            processingMode === mode.value
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border/60 bg-background/40 text-subtle hover:border-primary/40"
+          }`}
+        >
+          <div className="text-sm font-medium">{mode.label}</div>
+          <div className="mt-0.5 text-[10px] leading-relaxed">{mode.desc}</div>
+        </button>
+      ))}
+    </div>
+    {processingMode === "faiss" && (
+      <p className="text-[11px] text-subtle">
+        FAISS finds top-15 nearest neighbors per record instead of comparing all pairs.
+        Up to 100× faster on large datasets with minimal accuracy loss.
+      </p>
+    )}
+    {processingMode === "exact" && (
+      <p className="text-[11px] text-subtle">
+        Compares every possible pair. Best for datasets under 1,000 records where
+        maximum accuracy matters.
+      </p>
+    )}
+  </div>
+</div>
           <FileDrop onFile={handleFile} loading={loading} fileName={file?.name} />
 
           {data && (

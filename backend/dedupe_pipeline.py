@@ -225,6 +225,68 @@ def compute_combined_scores(
     np.fill_diagonal(combined, 1.0)
     return combined
 
+def find_candidate_pairs_faiss(
+    embeddings: np.ndarray,
+    top_k: int = 15,
+) -> List[Tuple[int, int]]:
+    """Use FAISS to find top-K nearest neighbors per record instead of all pairs."""
+    import faiss
+    n, d = embeddings.shape
+
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    normalized = (embeddings / np.maximum(norms, 1e-10)).astype(np.float32)
+
+    index = faiss.IndexFlatIP(d)
+    index.add(normalized)
+    _, indices = index.search(normalized, top_k + 1)
+
+    seen = set()
+    pairs = []
+    for i in range(n):
+        for k in range(1, top_k + 1):
+            j = int(indices[i, k])
+            if j < 0:
+                continue
+            pair = (min(i, j), max(i, j))
+            if pair not in seen:
+                seen.add(pair)
+                pairs.append(pair)
+    return pairs
+
+
+def compute_combined_scores_faiss(
+    records: List[Dict],
+    embeddings: np.ndarray,
+    domain: str = DEFAULT_DOMAIN,
+    top_k: int = 15,
+) -> np.ndarray:
+    """
+    Sparse similarity computation using FAISS candidate pairs.
+    O(n log n) instead of O(n²) — much faster for large datasets.
+    Accuracy tradeoff: may miss pairs outside top-K neighbors.
+    """
+    n = len(records)
+    combined = np.zeros((n, n))
+    np.fill_diagonal(combined, 1.0)
+
+    config = get_domain_config(domain)
+    candidate_pairs = find_candidate_pairs_faiss(embeddings, top_k=top_k)
+
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    normalized = embeddings / np.maximum(norms, 1e-10)
+
+    for i, j in candidate_pairs:
+        semantic = float(np.dot(normalized[i], normalized[j]))
+        fuzzy = compute_fuzzy_similarity(records[i]["text"], records[j]["text"])
+        w = config["same_script"] if same_script(
+            records[i]["text"], records[j]["text"]
+        ) else config["cross_script"]
+        score = w["semantic"] * semantic + w["fuzzy"] * fuzzy
+        combined[i, j] = score
+        combined[j, i] = score
+
+    return combined
+
 
 # ============================================================
 # CLUSTERING (Union-Find)

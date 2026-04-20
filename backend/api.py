@@ -10,14 +10,17 @@ Endpoints:
     POST /rethreshold         — Re-cluster with new threshold (uses cached matrix)
     POST /feedback            — Submit thumbs up/down for active learning
     POST /explain             — Token attribution for a pair
-    GET  /export/{job_id}     — Download deduplicated CSV
+    GET  /export/{job_id}     — Download deduplicated CSV or PDF
+    GET  /heatmap/{job_id}/{cluster_index} — Similarity heatmap for a cluster
     GET  /health              — Health check
+    GET  /domains             — Available domains and configs
 
 Design decisions:
     - Jobs run in a background thread so /run returns immediately
     - Progress is stored in-memory (dict) and polled via /status
-    - Column mapping: user picks any CSV column → pipeline sees it as "text"
+    - Column mapping: user picks any CSV column -> pipeline sees it as "text"
     - Domain-aware thresholds and weights loaded from dedupe_pipeline.DOMAIN_CONFIG
+    - FAISS approximate search auto-enabled for datasets > 1000 records
     - Arbiter is optional: skipped gracefully if OPENAI_API_KEY missing or quota hit
     - No DB: job store is in-memory, fine for demo/hackathon scope
 """
@@ -57,6 +60,8 @@ app.add_middleware(
 
 jobs: Dict[str, Dict[str, Any]] = {}
 
+AUTO_FAISS_THRESHOLD = 1000  # switch to FAISS above this record count
+
 
 def new_job() -> str:
     job_id = str(uuid.uuid4())
@@ -69,6 +74,8 @@ def new_job() -> str:
         "error": None,
         "combined_matrix": None,
         "feedback": [],
+        "used_faiss": False,
+        "domain": None,
     }
     return job_id
 
@@ -82,7 +89,6 @@ def update_job(job_id: str, **kwargs):
 # ============================================================
 
 def _detect_language(text: str) -> str:
-    """Auto-detect language using langdetect with script-based fallback."""
     try:
         import langdetect
         return langdetect.detect(text)
@@ -92,8 +98,7 @@ def _detect_language(text: str) -> str:
             "latin": "en", "cjk": "zh", "arabic": "ar",
             "devanagari": "hi", "thai": "th", "hangul": "ko", "other": "en",
         }
-        detected_script = detect_script(text)
-        return script_to_lang.get(detected_script, "en")
+        return script_to_lang.get(detect_script(text), "en")
 
 
 # ============================================================
@@ -101,30 +106,28 @@ def _detect_language(text: str) -> str:
 # ============================================================
 
 def _validate_csv(rows: List[Dict], text_column: str) -> List[str]:
-    """Return list of warning strings about data quality issues."""
     warnings = []
 
     empty = sum(1 for r in rows if not str(r.get(text_column, "")).strip())
     if empty > 0:
-        warnings.append(f"{empty} records have empty text — they will be skipped")
+        warnings.append(f"{empty} records have empty text - they will be skipped")
 
     short = sum(1 for r in rows if 0 < len(str(r.get(text_column, ""))) < 3)
     if short > 0:
-        warnings.append(
-            f"{short} records are very short (under 3 chars) — matching may be unreliable"
-        )
+        warnings.append(f"{short} records are very short (under 3 chars) - matching may be unreliable")
 
     from dedupe_pipeline import detect_script
     sample = [str(r.get(text_column, "")) for r in rows[:100] if str(r.get(text_column, "")).strip()]
     scripts = set(detect_script(t) for t in sample)
     if len(scripts) == 1:
-        warnings.append(
-            "Only one script detected in sample — this tool works best with multilingual data"
-        )
+        warnings.append("Only one script detected in sample - this tool works best with multilingual data")
 
     if len(rows) > 5000:
+        warnings.append(f"{len(rows)} records detected - processing may take several minutes")
+
+    if len(rows) > AUTO_FAISS_THRESHOLD:
         warnings.append(
-            f"{len(rows)} records detected — processing may take several minutes"
+            f"Large dataset ({len(rows)} records) - FAISS approximate search will be used unless Exact mode is selected"
         )
 
     return warnings
@@ -140,8 +143,10 @@ class RunRequest(BaseModel):
     language_column: Optional[str] = None
     id_column: Optional[str] = None
     domain: Optional[str] = "E-commerce Products"
-    threshold: Optional[float] = None      # derived from domain if not set
+    threshold: Optional[float] = None
     top_n_arbiter: Optional[int] = 15
+    use_faiss: Optional[bool] = None   # None = auto, True = force FAISS, False = force exact
+    faiss_top_k: Optional[int] = 15
 
 
 class UploadResponse(BaseModel):
@@ -175,6 +180,7 @@ class ResultsResponse(BaseModel):
     threshold_used: Optional[float]
     domain_config: Optional[Dict]
     language_breakdown: Optional[Dict]
+    used_faiss: Optional[bool]
 
 
 class RethresholdRequest(BaseModel):
@@ -202,7 +208,6 @@ class ExplainRequest(BaseModel):
 # ENDPOINTS
 # ============================================================
 
-
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "1.0.0"}
@@ -210,7 +215,6 @@ def health():
 
 @app.get("/domains")
 def get_domains():
-    """Return available domains and their configs for the frontend dropdown."""
     from dedupe_pipeline import DOMAIN_CONFIG, DEFAULT_DOMAIN
     return {
         "domains": list(DOMAIN_CONFIG.keys()),
@@ -221,10 +225,6 @@ def get_domains():
 
 @app.post("/upload", response_model=UploadResponse)
 async def upload_csv(file: UploadFile = File(...)):
-    """
-    Accept a CSV upload. Returns column names + preview so the
-    frontend can show a column selector before running the pipeline.
-    """
     if not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are supported.")
 
@@ -240,7 +240,7 @@ async def upload_csv(file: UploadFile = File(...)):
     if not rows:
         raise HTTPException(400, "CSV is empty.")
     if len(rows) > 50_000:
-        raise HTTPException(400, "File too large — maximum 50,000 rows supported.")
+        raise HTTPException(400, "File too large - maximum 50,000 rows supported.")
 
     columns = list(rows[0].keys())
     if not columns:
@@ -250,11 +250,9 @@ async def upload_csv(file: UploadFile = File(...)):
     jobs[job_id]["raw_rows"] = rows
     jobs[job_id]["filename"] = file.filename
 
-    # Run validation on the first detected text column as a heuristic
-    # Full validation happens in /run once user picks the column
     warnings = []
     if len(rows) > 5000:
-        warnings.append(f"{len(rows)} records detected — processing may take several minutes")
+        warnings.append(f"{len(rows)} records detected - processing may take several minutes")
 
     return UploadResponse(
         job_id=job_id,
@@ -267,10 +265,6 @@ async def upload_csv(file: UploadFile = File(...)):
 
 @app.post("/run")
 def run_pipeline(req: RunRequest):
-    """
-    Kick off the dedup pipeline in a background thread.
-    Returns immediately with job_id — poll /status/{job_id} for progress.
-    """
     if req.job_id not in jobs:
         raise HTTPException(404, f"Job {req.job_id} not found. Upload a file first.")
 
@@ -285,25 +279,13 @@ def run_pipeline(req: RunRequest):
     if req.text_column not in raw_rows[0]:
         raise HTTPException(
             400,
-            f"Column '{req.text_column}' not found. "
-            f"Available: {list(raw_rows[0].keys())}",
+            f"Column '{req.text_column}' not found. Available: {list(raw_rows[0].keys())}",
         )
 
-    # Run column-specific validation now that we know the text column
     warnings = _validate_csv(raw_rows, req.text_column)
-    update_job(
-        req.job_id,
-        status="running",
-        progress=0,
-        stage="Starting...",
-        warnings=warnings,
-    )
+    update_job(req.job_id, status="running", progress=0, stage="Starting...", warnings=warnings)
 
-    thread = Thread(
-        target=_run_pipeline_thread,
-        args=(req.job_id, raw_rows, req),
-        daemon=True,
-    )
+    thread = Thread(target=_run_pipeline_thread, args=(req.job_id, raw_rows, req), daemon=True)
     thread.start()
     return {"job_id": req.job_id, "status": "running", "warnings": warnings}
 
@@ -348,15 +330,12 @@ def get_results(job_id: str):
         threshold_used=r.get("threshold_used"),
         domain_config=r.get("domain_config"),
         language_breakdown=r.get("language_breakdown"),
+        used_faiss=r.get("used_faiss", False),
     )
 
 
 @app.post("/rethreshold")
 def rethreshold(req: RethresholdRequest):
-    """
-    Re-cluster using cached similarity matrix at a new threshold.
-    Returns updated clusters instantly — no re-embedding needed.
-    """
     if req.job_id not in jobs:
         raise HTTPException(404, "Job not found.")
 
@@ -378,20 +357,11 @@ def rethreshold(req: RethresholdRequest):
     grey_zone = find_grey_zone_pairs(records, matrix, req.threshold, domain=domain)
 
     id_to_record = {r["id"]: r for r in records}
-    clusters_enriched = [
-        [id_to_record[rid] for rid in cluster]
-        for cluster in clusters_ids
-    ]
+    clusters_enriched = [[id_to_record[rid] for rid in cluster] for cluster in clusters_ids]
     grey_zone_enriched = [
-        {
-            "score": round(float(score), 4),
-            "record_a": records[i],
-            "record_b": records[j],
-        }
+        {"score": round(float(score), 4), "record_a": records[i], "record_b": records[j]}
         for i, j, score in grey_zone[:50]
     ]
-
-    # Count records flagged as duplicates
     flagged_ids = {rid for cluster in clusters_ids for rid in cluster}
 
     return {
@@ -405,11 +375,6 @@ def rethreshold(req: RethresholdRequest):
 
 @app.post("/feedback")
 def submit_feedback(req: FeedbackRequest):
-    """
-    Accept user correction (thumbs up/down) on a duplicate pair.
-    After 3+ corrections, suggests an updated threshold.
-    This is the active learning loop.
-    """
     if req.job_id not in jobs:
         raise HTTPException(404, "Job not found.")
 
@@ -454,7 +419,6 @@ def submit_feedback(req: FeedbackRequest):
 
 @app.post("/explain")
 def explain(req: ExplainRequest):
-    """Token-level attribution for a duplicate pair."""
     from token_attribution import explain_pair_as_dict
     from dedupe_pipeline import compute_fuzzy_similarity, same_script
     fuzzy = compute_fuzzy_similarity(req.text_a, req.text_b)
@@ -485,7 +449,6 @@ def export_results(job_id: str, format: str = "csv"):
     total_records = j["results"].get("total_records", 0)
     total_clusters = j["results"].get("total_clusters", 0)
 
-    # Build cluster_id mapping
     record_to_cluster = {}
     for idx, cluster in enumerate(clusters):
         for record in cluster:
@@ -499,6 +462,57 @@ def export_results(job_id: str, format: str = "csv"):
     else:
         return _export_csv(records, record_to_cluster, job_id)
 
+
+@app.get("/heatmap/{job_id}/{cluster_index}")
+def get_heatmap(job_id: str, cluster_index: int):
+    if job_id not in jobs:
+        raise HTTPException(404, "Job not found.")
+
+    j = jobs[job_id]
+    if j["status"] != "done":
+        raise HTTPException(400, "Job not complete yet.")
+    if not j.get("combined_matrix"):
+        raise HTTPException(400, "Cached matrix not found. Re-run the pipeline.")
+
+    clusters = j["results"]["clusters"]
+    if cluster_index >= len(clusters):
+        raise HTTPException(404, "Cluster index out of range.")
+
+    cluster = clusters[cluster_index]
+    records = j.get("records", [])
+    matrix = np.array(j.get("combined_matrix", []))
+    id_to_idx = {r["id"]: i for i, r in enumerate(records)}
+
+    n = len(cluster)
+    heatmap_data = []
+    for i in range(n):
+        row = []
+        for k in range(n):
+            if i == k:
+                row.append(1.0)
+            else:
+                idx_i = id_to_idx.get(cluster[i]["id"])
+                idx_k = id_to_idx.get(cluster[k]["id"])
+                if idx_i is not None and idx_k is not None:
+                    row.append(round(float(matrix[idx_i][idx_k]), 4))
+                else:
+                    row.append(0.0)
+        heatmap_data.append(row)
+
+    return {
+        "cluster_index": cluster_index,
+        "records": [
+            {"id": r["id"], "text": r["text"], "language": r.get("language", "")}
+            for r in cluster
+        ],
+        "matrix": heatmap_data,
+        "threshold": j["results"].get("threshold_used", 0.76),
+    }
+
+
+# ============================================================
+# EXPORT HELPERS
+# ============================================================
 
 def _export_csv(records, record_to_cluster, job_id):
     output = io.StringIO()
@@ -518,9 +532,7 @@ def _export_csv(records, record_to_cluster, job_id):
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode()),
         media_type="text/csv",
-        headers={
-            "Content-Disposition": f"attachment; filename=deduplicated_{job_id[:8]}.csv"
-        },
+        headers={"Content-Disposition": f"attachment; filename=deduplicated_{job_id[:8]}.csv"},
     )
 
 
@@ -533,43 +545,27 @@ def _export_pdf(records, clusters, record_to_cluster, domain, threshold,
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
     )
-    from reportlab.lib.enums import TA_CENTER
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
+        buffer, pagesize=A4,
         rightMargin=2*cm, leftMargin=2*cm,
         topMargin=2*cm, bottomMargin=2*cm,
     )
-
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        "Title", parent=styles["Title"],
-        fontSize=20, spaceAfter=6, textColor=colors.HexColor("#1a1a2e")
-    )
-    heading_style = ParagraphStyle(
-        "Heading", parent=styles["Heading2"],
-        fontSize=13, spaceAfter=4, textColor=colors.HexColor("#16213e")
-    )
-    body_style = ParagraphStyle(
-        "Body", parent=styles["Normal"],
-        fontSize=9, spaceAfter=3
-    )
-    small_style = ParagraphStyle(
-        "Small", parent=styles["Normal"],
-        fontSize=8, textColor=colors.grey
-    )
+    title_style = ParagraphStyle("Title", parent=styles["Title"], fontSize=20, spaceAfter=6, textColor=colors.HexColor("#1a1a2e"))
+    heading_style = ParagraphStyle("Heading", parent=styles["Heading2"], fontSize=13, spaceAfter=4, textColor=colors.HexColor("#16213e"))
+    small_style = ParagraphStyle("Small", parent=styles["Normal"], fontSize=8, textColor=colors.grey)
 
     story = []
 
-    # ---- Title ----
+    # Title
     story.append(Paragraph("Multilingual Deduplication Report", title_style))
     story.append(Paragraph(f"Job ID: {job_id[:8]}  |  Domain: {domain}  |  Threshold: {threshold}", small_style))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e0e0e0")))
     story.append(Spacer(1, 0.4*cm))
 
-    # ---- Summary stats ----
+    # Summary
     story.append(Paragraph("Summary", heading_style))
     duplicate_records = len(record_to_cluster)
     unique_records = total_records - duplicate_records
@@ -601,57 +597,7 @@ def _export_pdf(records, clusters, record_to_cluster, domain, threshold,
     story.append(summary_table)
     story.append(Spacer(1, 0.6*cm))
 
-@app.get("/heatmap/{job_id}/{cluster_index}")
-def get_heatmap(job_id: str, cluster_index: int):
-    if job_id not in jobs:
-        raise HTTPException(404, "Job not found.")
-
-    j = jobs[job_id]
-
-    if j["status"] != "done":
-        raise HTTPException(400, "Job not complete yet.")
-    if not j.get("combined_matrix"):
-        raise HTTPException(400, "Cached matrix not found. Re-run the pipeline.")
-
-    clusters = j["results"]["clusters"]
-
-    if cluster_index >= len(clusters):
-        raise HTTPException(404, "Cluster index out of range.")
-
-    cluster = clusters[cluster_index]
-    records = j.get("records", [])
-    matrix = np.array(j.get("combined_matrix", []))
-
-    id_to_idx = {r["id"]: i for i, r in enumerate(records)}
-
-    n = len(cluster)
-    heatmap_data = []
-
-    for i in range(n):
-        row = []
-        for k in range(n):
-            if i == k:
-                row.append(1.0)
-            else:
-                idx_i = id_to_idx.get(cluster[i]["id"])
-                idx_k = id_to_idx.get(cluster[k]["id"])
-                if idx_i is not None and idx_k is not None:
-                    row.append(round(float(matrix[idx_i][idx_k]), 4))
-                else:
-                    row.append(0.0)
-        heatmap_data.append(row)
-
-    return {
-        "cluster_index": cluster_index,
-        "records": [
-            {"id": r["id"], "text": r["text"], "language": r.get("language", "")}
-            for r in cluster
-        ],
-        "matrix": heatmap_data,
-        "threshold": j["results"].get("threshold_used", 0.76),
-    }
-    
-    # ---- Duplicate groups ----
+    # Duplicate groups
     story.append(Paragraph(f"Duplicate Groups ({len(clusters)} groups)", heading_style))
     story.append(Paragraph(
         "Records in the same group refer to the same real-world entity across languages.",
@@ -659,12 +605,11 @@ def get_heatmap(job_id: str, cluster_index: int):
     ))
     story.append(Spacer(1, 0.3*cm))
 
-    for idx, cluster in enumerate(clusters[:50]):  # cap at 50 groups in PDF
+    for idx, cluster in enumerate(clusters[:50]):
         story.append(Paragraph(
-            f"Group {idx + 1} — {len(cluster)} records",
-            ParagraphStyle("GroupHeader", parent=styles["Normal"],
-                          fontSize=9, fontName="Helvetica-Bold",
-                          textColor=colors.HexColor("#16213e"))
+            f"Group {idx + 1} - {len(cluster)} records",
+            ParagraphStyle("GroupHeader", parent=styles["Normal"], fontSize=9,
+                           fontName="Helvetica-Bold", textColor=colors.HexColor("#16213e"))
         ))
         group_data = [["ID", "Text", "Language"]]
         for record in cluster:
@@ -692,14 +637,14 @@ def get_heatmap(job_id: str, cluster_index: int):
             small_style
         ))
 
-    # ---- Full records table ----
+    # All records table
     story.append(Spacer(1, 0.4*cm))
     story.append(Paragraph("All Records", heading_style))
     story.append(Paragraph("Complete list with duplicate flags.", small_style))
     story.append(Spacer(1, 0.3*cm))
 
     records_data = [["ID", "Text", "Lang", "Cluster", "Duplicate"]]
-    for record in records[:200]:  # cap at 200 rows for PDF readability
+    for record in records[:200]:
         text = record["text"][:45] + "..." if len(record["text"]) > 45 else record["text"]
         cluster_id = record_to_cluster.get(record["id"], "-")
         is_dup = "Yes" if record["id"] in record_to_cluster else "No"
@@ -720,7 +665,6 @@ def get_heatmap(job_id: str, cluster_index: int):
         ("TOPPADDING", (0, 0), (-1, -1), 3),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9f9f9")]),
-        # Highlight duplicate rows
         *[
             ("TEXTCOLOR", (4, i+1), (4, i+1), colors.red)
             for i, record in enumerate(records[:200])
@@ -741,10 +685,9 @@ def get_heatmap(job_id: str, cluster_index: int):
     return StreamingResponse(
         buffer,
         media_type="application/pdf",
-        headers={
-            "Content-Disposition": f"attachment; filename=dedup_report_{job_id[:8]}.pdf"
-        },
+        headers={"Content-Disposition": f"attachment; filename=dedup_report_{job_id[:8]}.pdf"},
     )
+
 
 # ============================================================
 # BACKGROUND PIPELINE RUNNER
@@ -768,32 +711,71 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
         embeddings = generate_embeddings(texts, model)
 
         # ---- Stage 4: Similarity + Domain config ----
-        update_job(job_id, stage="Computing similarity matrix...", progress=45)
         from dedupe_pipeline import (
             compute_semantic_similarity,
             compute_combined_scores,
+            compute_combined_scores_faiss,
             get_domain_config,
             DEFAULT_DOMAIN,
         )
         domain = req.domain or DEFAULT_DOMAIN
         config = get_domain_config(domain)
         threshold = req.threshold if req.threshold is not None else config["threshold"]
+        n_records = len(records)
 
-        sem_matrix = compute_semantic_similarity(embeddings)
-        combined_matrix = compute_combined_scores(records, sem_matrix, domain=domain)
+        # ---- FAISS vs Exact decision ----
+        if req.use_faiss is True:
+            # User explicitly chose FAISS
+            update_job(
+                job_id,
+                stage=f"Computing similarity (FAISS approximate, top-{req.faiss_top_k or 15} neighbors)...",
+                progress=45
+            )
+            combined_matrix = compute_combined_scores_faiss(
+                records, embeddings, domain=domain, top_k=req.faiss_top_k or 15
+            )
+            used_faiss = True
 
-        # Cache matrix and records for rethreshold + feedback
+        elif req.use_faiss is False:
+            # User explicitly chose Exact - never use FAISS
+            update_job(
+                job_id,
+                stage=f"Computing similarity (exact, {n_records * (n_records - 1) // 2:,} pairs)...",
+                progress=45
+            )
+            sem_matrix = compute_semantic_similarity(embeddings)
+            combined_matrix = compute_combined_scores(records, sem_matrix, domain=domain)
+            used_faiss = False
+
+        else:
+            # Auto mode - switch to FAISS for large datasets
+            if n_records > AUTO_FAISS_THRESHOLD:
+                update_job(
+                    job_id,
+                    stage=f"Large dataset ({n_records} records) - using FAISS approximate search...",
+                    progress=45
+                )
+                combined_matrix = compute_combined_scores_faiss(
+                    records, embeddings, domain=domain, top_k=15
+                )
+                used_faiss = True
+            else:
+                update_job(job_id, stage="Computing similarity matrix (exact)...", progress=45)
+                sem_matrix = compute_semantic_similarity(embeddings)
+                combined_matrix = compute_combined_scores(records, sem_matrix, domain=domain)
+                used_faiss = False
+
+        # Cache matrix and records for rethreshold + feedback + heatmap
         jobs[job_id]["combined_matrix"] = combined_matrix.tolist()
         jobs[job_id]["records"] = records
         jobs[job_id]["domain"] = domain
+        jobs[job_id]["used_faiss"] = used_faiss
 
         # ---- Stage 5: Clustering ----
         update_job(job_id, stage="Clustering duplicates...", progress=65)
         from dedupe_pipeline import cluster_duplicates, find_grey_zone_pairs
         clusters_ids = cluster_duplicates(records, combined_matrix, threshold)
-        grey_zone = find_grey_zone_pairs(
-            records, combined_matrix, threshold, domain=domain
-        )
+        grey_zone = find_grey_zone_pairs(records, combined_matrix, threshold, domain=domain)
 
         # ---- Stage 6: LLM Arbitration ----
         update_job(job_id, stage="Running LLM arbitration...", progress=75)
@@ -858,7 +840,6 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
             for i, j, score in grey_zone[:50]
         ]
 
-        # Language breakdown
         lang_breakdown = _language_breakdown(clusters_enriched, records)
 
         results = {
@@ -874,6 +855,7 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
             "threshold_used": threshold,
             "domain_config": config,
             "language_breakdown": lang_breakdown,
+            "used_faiss": used_faiss,
         }
 
         # Evaluate against ground truth if demo dataset
@@ -881,32 +863,18 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
         if gt_path.exists() and _is_demo_dataset(records):
             from dedupe_pipeline import load_ground_truth, evaluate
             ground_truth = load_ground_truth(gt_path)
-            metrics = evaluate(
-                clusters_ids, ground_truth, [r["id"] for r in records]
-            )
+            metrics = evaluate(clusters_ids, ground_truth, [r["id"] for r in records])
             results["metrics"] = {
                 k: round(v, 3) if isinstance(v, float) else v
                 for k, v in metrics.items()
             }
 
-        update_job(
-            job_id,
-            status="done",
-            progress=100,
-            stage="Complete",
-            results=results,
-        )
+        update_job(job_id, status="done", progress=100, stage="Complete", results=results)
 
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[pipeline error] {tb}")
-        update_job(
-            job_id,
-            status="error",
-            progress=0,
-            stage="Error",
-            error=str(e),
-        )
+        update_job(job_id, status="error", progress=0, stage="Error", error=str(e))
 
 
 # ============================================================
@@ -918,7 +886,7 @@ def _map_columns(raw_rows: List[Dict], req: RunRequest) -> List[Dict]:
     for idx, row in enumerate(raw_rows):
         text = str(row.get(req.text_column, "")).strip()
         if not text:
-            continue  # skip empty rows
+            continue
 
         record_id = (
             str(row[req.id_column])
@@ -942,10 +910,7 @@ def _map_columns(raw_rows: List[Dict], req: RunRequest) -> List[Dict]:
 
 
 def _is_demo_dataset(records: List[Dict]) -> bool:
-    return any(
-        r["id"].startswith("R") and r["id"][1:].isdigit()
-        for r in records[:5]
-    )
+    return any(r["id"].startswith("R") and r["id"][1:].isdigit() for r in records[:5])
 
 
 def _language_breakdown(clusters: List[List[Dict]], all_records: List[Dict]) -> Dict:
