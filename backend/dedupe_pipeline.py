@@ -42,6 +42,37 @@ THRESHOLD = 0.76
 SAME_SCRIPT_WEIGHTS = {"semantic": 0.85, "fuzzy": 0.15}
 CROSS_SCRIPT_WEIGHTS = {"semantic": 0.97, "fuzzy": 0.03}
 
+DOMAIN_CONFIG = {
+    "E-commerce Products": {
+        "threshold": 0.82,
+        "grey_zone": 0.04,
+        "same_script":  {"semantic": 0.80, "fuzzy": 0.20},
+        "cross_script": {"semantic": 0.97, "fuzzy": 0.03},
+    },
+    "Company Names": {
+        "threshold": 0.76,
+        "grey_zone": 0.05,
+        "same_script":  {"semantic": 0.75, "fuzzy": 0.25},
+        "cross_script": {"semantic": 0.97, "fuzzy": 0.03},
+    },
+    "Person Names": {
+        "threshold": 0.79,
+        "grey_zone": 0.05,
+        "same_script":  {"semantic": 0.55, "fuzzy": 0.45},
+        "cross_script": {"semantic": 0.90, "fuzzy": 0.10},
+    },
+    "Medical Records": {
+        "threshold": 0.91,
+        "grey_zone": 0.03,
+        "same_script":  {"semantic": 0.85, "fuzzy": 0.15},
+        "cross_script": {"semantic": 0.98, "fuzzy": 0.02},
+    },
+}
+DEFAULT_DOMAIN = "E-commerce Products"
+
+def get_domain_config(domain: str) -> dict:
+    return DOMAIN_CONFIG.get(domain, DOMAIN_CONFIG[DEFAULT_DOMAIN])
+
 # Disable category enrichment for now - it was causing under-clustering
 # by making all records in a category look too similar
 SHORT_TEXT_THRESHOLD = 0  # effectively disables enrichment
@@ -164,13 +195,11 @@ def compute_fuzzy_similarity(text_a: str, text_b: str) -> float:
 def compute_combined_scores(
     records: List[Dict],
     semantic_matrix: np.ndarray,
+    domain: str = DEFAULT_DOMAIN,        # NEW parameter
 ) -> np.ndarray:
-    """
-    Combine semantic + fuzzy with script-aware weighting.
-    IMPORTANT: fuzzy matching uses ORIGINAL text, not enriched text,
-    since fuzzy should compare user-visible strings.
-    """
-    print("  Computing combined scores (script-aware weights)...")
+    config = get_domain_config(domain)   # NEW
+    print(f"  Using domain: '{domain}'")
+    print(f"  Computing combined scores (script-aware weights)...")
     n = len(records)
     combined = np.zeros((n, n))
 
@@ -178,14 +207,13 @@ def compute_combined_scores(
         for j in range(i + 1, n):
             text_a = records[i]["text"]
             text_b = records[j]["text"]
-
             semantic = semantic_matrix[i, j]
             fuzzy = compute_fuzzy_similarity(text_a, text_b)
 
             if same_script(text_a, text_b):
-                w = SAME_SCRIPT_WEIGHTS
+                w = config["same_script"]    # domain-specific weights
             else:
-                w = CROSS_SCRIPT_WEIGHTS
+                w = config["cross_script"]   # domain-specific weights
 
             score = w["semantic"] * semantic + w["fuzzy"] * fuzzy
             combined[i, j] = score
@@ -288,7 +316,9 @@ def evaluate(
 # GREY-ZONE DETECTION
 # ============================================================
 
-def find_grey_zone_pairs(records, score_matrix, threshold, band=0.02):
+def find_grey_zone_pairs(records, score_matrix, threshold, band=None, domain=DEFAULT_DOMAIN):
+    if band is None:
+        band = get_domain_config(domain)["grey_zone"]  # use domain-specific band
     n = len(records)
     grey = []
     seen = set()
@@ -311,6 +341,10 @@ def find_grey_zone_pairs(records, score_matrix, threshold, band=0.02):
 # ============================================================
 
 def run_pipeline():
+    domain = DEFAULT_DOMAIN
+    config = get_domain_config(domain)
+    threshold = config["threshold"]
+
     print("=" * 60)
     print("MULTILINGUAL DUPLICATE DETECTION PIPELINE")
     print("=" * 60)
@@ -335,10 +369,10 @@ def run_pipeline():
 
     print("\n[5/7] Computing similarity...")
     semantic_matrix = compute_semantic_similarity(embeddings)
-    combined_matrix = compute_combined_scores(records, semantic_matrix)
+    combined_matrix = compute_combined_scores(records, semantic_matrix, domain=domain)
 
     print(f"\n[6/7] Clustering duplicates (threshold={THRESHOLD})...")
-    clusters = cluster_duplicates(records, combined_matrix, THRESHOLD)
+    clusters = cluster_duplicates(records, combined_matrix, threshold)
     print(f"  Found {len(clusters)} duplicate groups")
 
     print("\n[7/7] Evaluating against ground truth...")
@@ -356,7 +390,7 @@ def run_pipeline():
     print(f"\nPredicted duplicate pairs: {metrics['total_predicted_pairs']}")
     print(f"Actual duplicate pairs:    {metrics['total_true_pairs']}")
 
-    grey_zone = find_grey_zone_pairs(records, combined_matrix, THRESHOLD)
+    grey_zone = find_grey_zone_pairs(records, combined_matrix, threshold, domain=domain)
     print(f"\nGrey zone pairs (±0.05 of threshold): {len(grey_zone)}")
     print("  -> these will be sent to LLM arbitration in the full system")
 

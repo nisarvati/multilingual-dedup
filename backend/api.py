@@ -1,26 +1,29 @@
 """
 api.py
-
 FastAPI server wrapping the multilingual dedup pipeline.
 
 Endpoints:
-    POST /upload          — Upload CSV, get back column names for selection
-    POST /run             — Run pipeline on uploaded file with chosen column
-    GET  /status/{job_id} — Poll job progress (SSE-friendly)
-    GET  /results/{job_id}— Get full results + clusters + arbiter decisions
-    GET  /health          — Health check
+    POST /upload              — Upload CSV, get back column names for selection
+    POST /run                 — Run pipeline on uploaded file with chosen column
+    GET  /status/{job_id}     — Poll job progress
+    GET  /results/{job_id}    — Get full results + clusters + arbiter decisions
+    POST /rethreshold         — Re-cluster with new threshold (uses cached matrix)
+    POST /feedback            — Submit thumbs up/down for active learning
+    POST /explain             — Token attribution for a pair
+    GET  /export/{job_id}     — Download deduplicated CSV
+    GET  /health              — Health check
 
 Design decisions:
     - Jobs run in a background thread so /run returns immediately
     - Progress is stored in-memory (dict) and polled via /status
     - Column mapping: user picks any CSV column → pipeline sees it as "text"
+    - Domain-aware thresholds and weights loaded from dedupe_pipeline.DOMAIN_CONFIG
     - Arbiter is optional: skipped gracefully if OPENAI_API_KEY missing or quota hit
     - No DB: job store is in-memory, fine for demo/hackathon scope
 """
 
 import csv
 import io
-import json
 import os
 import time
 import traceback
@@ -33,15 +36,17 @@ import numpy as np
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from langdetect import DetectorFactory
 from pydantic import BaseModel
 
+DetectorFactory.seed = 42
 load_dotenv()
 
 app = FastAPI(title="Multilingual Dedup API", version="1.0.0")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # tighten in prod
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -51,18 +56,19 @@ app.add_middleware(
 # ============================================================
 
 jobs: Dict[str, Dict[str, Any]] = {}
-# Shape: { job_id: { status, progress, stage, records, results, error } }
 
 
 def new_job() -> str:
     job_id = str(uuid.uuid4())
     jobs[job_id] = {
-        "status": "pending",      # pending | running | done | error
-        "progress": 0,            # 0-100
+        "status": "pending",
+        "progress": 0,
         "stage": "Queued",
-        "records": [],            # raw parsed records (after column mapping)
-        "results": None,          # final results dict
+        "records": [],
+        "results": None,
         "error": None,
+        "combined_matrix": None,
+        "feedback": [],
     }
     return job_id
 
@@ -72,15 +78,69 @@ def update_job(job_id: str, **kwargs):
 
 
 # ============================================================
+# LANGUAGE DETECTION
+# ============================================================
+
+def _detect_language(text: str) -> str:
+    """Auto-detect language using langdetect with script-based fallback."""
+    try:
+        import langdetect
+        return langdetect.detect(text)
+    except Exception:
+        from dedupe_pipeline import detect_script
+        script_to_lang = {
+            "latin": "en", "cjk": "zh", "arabic": "ar",
+            "devanagari": "hi", "thai": "th", "hangul": "ko", "other": "en",
+        }
+        detected_script = detect_script(text)
+        return script_to_lang.get(detected_script, "en")
+
+
+# ============================================================
+# CSV VALIDATION
+# ============================================================
+
+def _validate_csv(rows: List[Dict], text_column: str) -> List[str]:
+    """Return list of warning strings about data quality issues."""
+    warnings = []
+
+    empty = sum(1 for r in rows if not str(r.get(text_column, "")).strip())
+    if empty > 0:
+        warnings.append(f"{empty} records have empty text — they will be skipped")
+
+    short = sum(1 for r in rows if 0 < len(str(r.get(text_column, ""))) < 3)
+    if short > 0:
+        warnings.append(
+            f"{short} records are very short (under 3 chars) — matching may be unreliable"
+        )
+
+    from dedupe_pipeline import detect_script
+    sample = [str(r.get(text_column, "")) for r in rows[:100] if str(r.get(text_column, "")).strip()]
+    scripts = set(detect_script(t) for t in sample)
+    if len(scripts) == 1:
+        warnings.append(
+            "Only one script detected in sample — this tool works best with multilingual data"
+        )
+
+    if len(rows) > 5000:
+        warnings.append(
+            f"{len(rows)} records detected — processing may take several minutes"
+        )
+
+    return warnings
+
+
+# ============================================================
 # REQUEST / RESPONSE MODELS
 # ============================================================
 
 class RunRequest(BaseModel):
-    job_id: str           # from /upload response
-    text_column: str      # which CSV column to use as the dedup text
-    language_column: Optional[str] = None   # optional — auto-detected if absent
-    id_column: Optional[str] = None         # optional — uses row index if absent
-    threshold: Optional[float] = 0.76
+    job_id: str
+    text_column: str
+    language_column: Optional[str] = None
+    id_column: Optional[str] = None
+    domain: Optional[str] = "E-commerce Products"
+    threshold: Optional[float] = None      # derived from domain if not set
     top_n_arbiter: Optional[int] = 15
 
 
@@ -88,7 +148,8 @@ class UploadResponse(BaseModel):
     job_id: str
     columns: List[str]
     row_count: int
-    preview: List[Dict]   # first 5 rows
+    preview: List[Dict]
+    warnings: List[str]
 
 
 class StatusResponse(BaseModel):
@@ -103,11 +164,36 @@ class ResultsResponse(BaseModel):
     job_id: str
     status: str
     metrics: Optional[Dict]
-    clusters: Optional[List[List[Dict]]]       # each cluster = list of record dicts
+    clusters: Optional[List[List[Dict]]]
     grey_zone_pairs: Optional[List[Dict]]
     arbiter_decisions: Optional[List[Dict]]
     total_records: Optional[int]
     total_clusters: Optional[int]
+    domain: Optional[str]
+    threshold_used: Optional[float]
+    domain_config: Optional[Dict]
+    language_breakdown: Optional[Dict]
+
+
+class RethresholdRequest(BaseModel):
+    job_id: str
+    threshold: float
+
+
+class FeedbackRequest(BaseModel):
+    job_id: str
+    record_id_a: str
+    record_id_b: str
+    is_duplicate: bool
+
+
+class ExplainRequest(BaseModel):
+    text_a: str
+    text_b: str
+    language_a: str = "en"
+    language_b: str = "en"
+    semantic_score: float
+    domain: str = "E-commerce Products"
 
 
 # ============================================================
@@ -117,6 +203,17 @@ class ResultsResponse(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "1.0.0"}
+
+
+@app.get("/domains")
+def get_domains():
+    """Return available domains and their configs for the frontend dropdown."""
+    from dedupe_pipeline import DOMAIN_CONFIG, DEFAULT_DOMAIN
+    return {
+        "domains": list(DOMAIN_CONFIG.keys()),
+        "default": DEFAULT_DOMAIN,
+        "configs": DOMAIN_CONFIG,
+    }
 
 
 @app.post("/upload", response_model=UploadResponse)
@@ -139,19 +236,29 @@ async def upload_csv(file: UploadFile = File(...)):
 
     if not rows:
         raise HTTPException(400, "CSV is empty.")
+    if len(rows) > 50_000:
+        raise HTTPException(400, "File too large — maximum 50,000 rows supported.")
 
     columns = list(rows[0].keys())
-    job_id = new_job()
+    if not columns:
+        raise HTTPException(400, "CSV has no columns.")
 
-    # Store raw rows in job so /run can access them without re-upload
+    job_id = new_job()
     jobs[job_id]["raw_rows"] = rows
     jobs[job_id]["filename"] = file.filename
+
+    # Run validation on the first detected text column as a heuristic
+    # Full validation happens in /run once user picks the column
+    warnings = []
+    if len(rows) > 5000:
+        warnings.append(f"{len(rows)} records detected — processing may take several minutes")
 
     return UploadResponse(
         job_id=job_id,
         columns=columns,
         row_count=len(rows),
         preview=rows[:5],
+        warnings=warnings,
     )
 
 
@@ -176,18 +283,26 @@ def run_pipeline(req: RunRequest):
         raise HTTPException(
             400,
             f"Column '{req.text_column}' not found. "
-            f"Available: {list(raw_rows[0].keys())}"
+            f"Available: {list(raw_rows[0].keys())}",
         )
 
-    update_job(req.job_id, status="running", progress=0, stage="Starting...")
+    # Run column-specific validation now that we know the text column
+    warnings = _validate_csv(raw_rows, req.text_column)
+    update_job(
+        req.job_id,
+        status="running",
+        progress=0,
+        stage="Starting...",
+        warnings=warnings,
+    )
+
     thread = Thread(
         target=_run_pipeline_thread,
         args=(req.job_id, raw_rows, req),
         daemon=True,
     )
     thread.start()
-
-    return {"job_id": req.job_id, "status": "running"}
+    return {"job_id": req.job_id, "status": "running", "warnings": warnings}
 
 
 @app.get("/status/{job_id}", response_model=StatusResponse)
@@ -224,6 +339,170 @@ def get_results(job_id: str):
         arbiter_decisions=r.get("arbiter_decisions"),
         total_records=r.get("total_records"),
         total_clusters=r.get("total_clusters"),
+        domain=r.get("domain"),
+        threshold_used=r.get("threshold_used"),
+        domain_config=r.get("domain_config"),
+        language_breakdown=r.get("language_breakdown"),
+    )
+
+
+@app.post("/rethreshold")
+def rethreshold(req: RethresholdRequest):
+    """
+    Re-cluster using cached similarity matrix at a new threshold.
+    Returns updated clusters instantly — no re-embedding needed.
+    """
+    if req.job_id not in jobs:
+        raise HTTPException(404, "Job not found.")
+
+    j = jobs[req.job_id]
+    if j["status"] != "done":
+        raise HTTPException(400, "Job not complete yet.")
+
+    combined_matrix = j.get("combined_matrix")
+    records = j.get("records")
+    domain = j.get("domain", "E-commerce Products")
+
+    if combined_matrix is None or records is None:
+        raise HTTPException(400, "Cached matrix not found. Re-run the pipeline.")
+
+    from dedupe_pipeline import cluster_duplicates, find_grey_zone_pairs
+    matrix = np.array(combined_matrix)
+
+    clusters_ids = cluster_duplicates(records, matrix, req.threshold)
+    grey_zone = find_grey_zone_pairs(records, matrix, req.threshold, domain=domain)
+
+    id_to_record = {r["id"]: r for r in records}
+    clusters_enriched = [
+        [id_to_record[rid] for rid in cluster]
+        for cluster in clusters_ids
+    ]
+    grey_zone_enriched = [
+        {
+            "score": round(float(score), 4),
+            "record_a": records[i],
+            "record_b": records[j],
+        }
+        for i, j, score in grey_zone[:50]
+    ]
+
+    # Count records flagged as duplicates
+    flagged_ids = {rid for cluster in clusters_ids for rid in cluster}
+
+    return {
+        "threshold": req.threshold,
+        "total_clusters": len(clusters_ids),
+        "total_flagged": len(flagged_ids),
+        "clusters": clusters_enriched,
+        "grey_zone_pairs": grey_zone_enriched,
+    }
+
+
+@app.post("/feedback")
+def submit_feedback(req: FeedbackRequest):
+    """
+    Accept user correction (thumbs up/down) on a duplicate pair.
+    After 3+ corrections, suggests an updated threshold.
+    This is the active learning loop.
+    """
+    if req.job_id not in jobs:
+        raise HTTPException(404, "Job not found.")
+
+    j = jobs[req.job_id]
+    if "feedback" not in j:
+        j["feedback"] = []
+
+    j["feedback"].append({
+        "record_id_a": req.record_id_a,
+        "record_id_b": req.record_id_b,
+        "is_duplicate": req.is_duplicate,
+        "timestamp": time.time(),
+    })
+
+    feedback_count = len(j["feedback"])
+    suggested_threshold = None
+    message = f"{3 - feedback_count} more corrections needed to suggest a threshold adjustment"
+
+    if feedback_count >= 3:
+        records = j.get("records", [])
+        matrix = j.get("combined_matrix")
+        if records and matrix is not None:
+            suggested_threshold = _optimize_threshold_from_feedback(
+                records, np.array(matrix), j["feedback"]
+            )
+            current = j["results"]["threshold_used"] if j.get("results") else 0.76
+            if abs(suggested_threshold - current) < 0.01:
+                message = f"Your corrections confirm the current threshold ({current:.2f}) is well-calibrated"
+            else:
+                message = (
+                    f"Based on your {feedback_count} corrections, "
+                    f"threshold {suggested_threshold:.2f} may work better "
+                    f"(currently {current:.2f})"
+                )
+
+    return {
+        "feedback_count": feedback_count,
+        "suggested_threshold": round(suggested_threshold, 3) if suggested_threshold else None,
+        "message": message,
+    }
+
+
+@app.post("/explain")
+def explain(req: ExplainRequest):
+    """Token-level attribution for a duplicate pair."""
+    from token_attribution import explain_pair_as_dict
+    from dedupe_pipeline import compute_fuzzy_similarity, same_script
+    fuzzy = compute_fuzzy_similarity(req.text_a, req.text_b)
+    ss = same_script(req.text_a, req.text_b)
+    return explain_pair_as_dict(
+        {"text": req.text_a, "language": req.language_a},
+        {"text": req.text_b, "language": req.language_b},
+        semantic_score=req.semantic_score,
+        fuzzy_score=fuzzy,
+        is_same_script=ss,
+        domain=req.domain,
+    )
+
+
+@app.get("/export/{job_id}")
+def export_results(job_id: str):
+    """Download deduplicated results as CSV."""
+    if job_id not in jobs:
+        raise HTTPException(404, "Job not found.")
+
+    j = jobs[job_id]
+    if j["status"] != "done":
+        raise HTTPException(400, "Job not complete yet.")
+
+    records = j.get("records", [])
+    clusters = j["results"].get("clusters", [])
+
+    record_to_cluster = {}
+    for idx, cluster in enumerate(clusters):
+        for record in cluster:
+            record_to_cluster[record["id"]] = idx + 1
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["id", "text", "language", "cluster_id", "is_duplicate"])
+    for record in records:
+        cluster_id = record_to_cluster.get(record["id"], "")
+        is_dup = record["id"] in record_to_cluster
+        writer.writerow([
+            record["id"],
+            record["text"],
+            record.get("language", ""),
+            cluster_id,
+            is_dup,
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=deduplicated_{job_id[:8]}.csv"
+        },
     )
 
 
@@ -232,10 +511,6 @@ def get_results(job_id: str):
 # ============================================================
 
 def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
-    """
-    Runs the full pipeline in a background thread.
-    Updates job progress at each stage so the frontend can poll.
-    """
     try:
         # ---- Stage 1: Column mapping ----
         update_job(job_id, stage="Mapping columns...", progress=5)
@@ -252,20 +527,35 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
         texts = [r["text"] for r in records]
         embeddings = generate_embeddings(texts, model)
 
-        # ---- Stage 4: Similarity ----
+        # ---- Stage 4: Similarity + Domain config ----
         update_job(job_id, stage="Computing similarity matrix...", progress=45)
-        from dedupe_pipeline import compute_semantic_similarity, compute_combined_scores
+        from dedupe_pipeline import (
+            compute_semantic_similarity,
+            compute_combined_scores,
+            get_domain_config,
+            DEFAULT_DOMAIN,
+        )
+        domain = req.domain or DEFAULT_DOMAIN
+        config = get_domain_config(domain)
+        threshold = req.threshold if req.threshold is not None else config["threshold"]
+
         sem_matrix = compute_semantic_similarity(embeddings)
-        combined_matrix = compute_combined_scores(records, sem_matrix)
+        combined_matrix = compute_combined_scores(records, sem_matrix, domain=domain)
+
+        # Cache matrix and records for rethreshold + feedback
+        jobs[job_id]["combined_matrix"] = combined_matrix.tolist()
+        jobs[job_id]["records"] = records
+        jobs[job_id]["domain"] = domain
 
         # ---- Stage 5: Clustering ----
         update_job(job_id, stage="Clustering duplicates...", progress=65)
-        from dedupe_pipeline import cluster_duplicates, find_grey_zone_pairs, UnionFind
-        threshold = req.threshold
+        from dedupe_pipeline import cluster_duplicates, find_grey_zone_pairs
         clusters_ids = cluster_duplicates(records, combined_matrix, threshold)
-        grey_zone = find_grey_zone_pairs(records, combined_matrix, threshold)
+        grey_zone = find_grey_zone_pairs(
+            records, combined_matrix, threshold, domain=domain
+        )
 
-       # ---- Stage 6: Arbiter ----
+        # ---- Stage 6: LLM Arbitration ----
         update_job(job_id, stage="Running LLM arbitration...", progress=75)
         arbiter_decisions = []
         try:
@@ -303,56 +593,72 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
             ]
         except Exception as e:
             print(f"[arbiter] Skipped: {e}")
-            traceback.print_exc()
             update_job(job_id, stage="Arbiter skipped — clustering complete...")
 
         # ---- Stage 7: Build response payload ----
         update_job(job_id, stage="Preparing results...", progress=90)
-
         id_to_record = {r["id"]: r for r in records}
 
-        # Enrich clusters with full record data (not just IDs)
         clusters_enriched = [
             [id_to_record[rid] for rid in cluster]
             for cluster in clusters_ids
         ]
-
-        # Enrich grey zone pairs
         grey_zone_enriched = [
             {
                 "score": round(float(score), 4),
                 "record_a": records[i],
                 "record_b": records[j],
             }
-            for i, j, score in grey_zone[:50]   # cap at 50 for payload size
+            for i, j, score in grey_zone[:50]
         ]
+
+        # Language breakdown
+        lang_breakdown = _language_breakdown(clusters_enriched, records)
 
         results = {
             "total_records": len(records),
             "total_clusters": len(clusters_ids),
-            "metrics": None,         # no ground truth for user uploads
+            "metrics": None,
             "clusters": clusters_enriched,
             "grey_zone_pairs": grey_zone_enriched,
             "arbiter_decisions": arbiter_decisions,
+            "domain": domain,
+            "threshold_used": threshold,
+            "domain_config": config,
+            "language_breakdown": lang_breakdown,
         }
 
-        # If this is the demo dataset, evaluate against ground truth
+        # Evaluate against ground truth if demo dataset
         gt_path = Path(__file__).parent.parent / "data" / "ground_truth.json"
         if gt_path.exists() and _is_demo_dataset(records):
             from dedupe_pipeline import load_ground_truth, evaluate
             ground_truth = load_ground_truth(gt_path)
-            metrics = evaluate(clusters_ids, ground_truth, [r["id"] for r in records])
-            results["metrics"] = {k: round(v, 3) if isinstance(v, float) else v
-                                  for k, v in metrics.items()}
+            metrics = evaluate(
+                clusters_ids, ground_truth, [r["id"] for r in records]
+            )
+            results["metrics"] = {
+                k: round(v, 3) if isinstance(v, float) else v
+                for k, v in metrics.items()
+            }
 
-        update_job(job_id, status="done", progress=100,
-                   stage="Complete", results=results)
+        update_job(
+            job_id,
+            status="done",
+            progress=100,
+            stage="Complete",
+            results=results,
+        )
 
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[pipeline error] {tb}")
-        update_job(job_id, status="error", progress=0,
-                   stage="Error", error=str(e))
+        update_job(
+            job_id,
+            status="error",
+            progress=0,
+            stage="Error",
+            error=str(e),
+        )
 
 
 # ============================================================
@@ -360,65 +666,87 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
 # ============================================================
 
 def _map_columns(raw_rows: List[Dict], req: RunRequest) -> List[Dict]:
-    """
-    Map user-chosen columns onto the standard schema the pipeline expects:
-        id, text, language, entity_type
-    """
     records = []
     for idx, row in enumerate(raw_rows):
+        text = str(row.get(req.text_column, "")).strip()
+        if not text:
+            continue  # skip empty rows
+
         record_id = (
             str(row[req.id_column])
             if req.id_column and req.id_column in row
             else f"R{idx:04d}"
         )
-        language = (
-            str(row[req.language_column])
-            if req.language_column and req.language_column in row
-            else "en"
-        )
+
+        if req.language_column and req.language_column in row:
+            language = str(row[req.language_column])
+        else:
+            language = _detect_language(text)
+
         records.append({
             "id": record_id,
-            "text": str(row[req.text_column]),
+            "text": text,
             "language": language,
             "entity_type": row.get("entity_type", "unknown"),
-            # Keep original row fields so frontend can display them
             "_original": dict(row),
         })
     return records
 
 
 def _is_demo_dataset(records: List[Dict]) -> bool:
-    """Heuristic: demo dataset IDs start with R followed by 4 digits."""
-    return any(r["id"].startswith("R") and r["id"][1:].isdigit() for r in records[:5])
+    return any(
+        r["id"].startswith("R") and r["id"][1:].isdigit()
+        for r in records[:5]
+    )
+
+
+def _language_breakdown(clusters: List[List[Dict]], all_records: List[Dict]) -> Dict:
+    clustered_ids = {r["id"] for cluster in clusters for r in cluster}
+    breakdown: Dict[str, Dict[str, int]] = {}
+    for record in all_records:
+        lang = record.get("language", "unknown")
+        if lang not in breakdown:
+            breakdown[lang] = {"clustered": 0, "unique": 0}
+        if record["id"] in clustered_ids:
+            breakdown[lang]["clustered"] += 1
+        else:
+            breakdown[lang]["unique"] += 1
+    return breakdown
+
+
+def _optimize_threshold_from_feedback(
+    records: List[Dict],
+    matrix: np.ndarray,
+    feedback: List[Dict],
+) -> float:
+    id_to_idx = {r["id"]: i for i, r in enumerate(records)}
+    best_threshold = 0.76
+    best_agreement = -1
+
+    for t in np.arange(0.65, 0.96, 0.01):
+        agreement = 0
+        total = 0
+        for fb in feedback:
+            idx_a = id_to_idx.get(fb["record_id_a"])
+            idx_b = id_to_idx.get(fb["record_id_b"])
+            if idx_a is None or idx_b is None:
+                continue
+            score = float(matrix[idx_a][idx_b])
+            predicted_dup = score >= t
+            if predicted_dup == fb["is_duplicate"]:
+                agreement += 1
+            total += 1
+        if total > 0 and agreement > best_agreement:
+            best_agreement = agreement
+            best_threshold = float(round(t, 2))
+
+    return best_threshold
 
 
 # ============================================================
 # ENTRY POINT
 # ============================================================
 
-
-class ExplainRequest(BaseModel):
-    text_a: str
-    text_b: str
-    language_a: str = "en"
-    language_b: str = "en"
-    semantic_score: float
-
-@app.post("/explain")
-def explain(req: ExplainRequest):
-    from token_attribution import explain_pair_as_dict
-    from dedupe_pipeline import compute_fuzzy_similarity, same_script
-    fuzzy = compute_fuzzy_similarity(req.text_a, req.text_b)
-    ss    = same_script(req.text_a, req.text_b)
-    return explain_pair_as_dict(
-        {"text": req.text_a, "language": req.language_a},
-        {"text": req.text_b, "language": req.language_b},
-        semantic_score=req.semantic_score,
-        fuzzy_score=fuzzy,
-        is_same_script=ss,
-    )
-
-    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)

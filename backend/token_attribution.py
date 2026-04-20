@@ -38,8 +38,11 @@ from rapidfuzz import fuzz
 # CONFIG — must mirror dedupe_pipeline.py
 # ============================================================
 
-SAME_SCRIPT_WEIGHTS  = {"semantic": 0.85, "fuzzy": 0.15}
-CROSS_SCRIPT_WEIGHTS = {"semantic": 0.97, "fuzzy": 0.03}
+from dedupe_pipeline import get_domain_config, DEFAULT_DOMAIN
+
+def get_weights_for_domain(domain: str = DEFAULT_DOMAIN):
+    config = get_domain_config(domain)
+    return config["same_script"], config["cross_script"]
 
 # Fuzzy threshold below which a token match is considered "no match"
 TOKEN_MATCH_FLOOR = 0.35
@@ -229,8 +232,10 @@ def decompose_score(
     semantic_score: float,
     fuzzy_score: float,
     is_same_script: bool,
+    domain: str = DEFAULT_DOMAIN,
 ) -> Dict[str, float]:
-    w = SAME_SCRIPT_WEIGHTS if is_same_script else CROSS_SCRIPT_WEIGHTS
+    same, cross = get_weights_for_domain(domain)
+    w = same if is_same_script else cross
     combined = w["semantic"] * semantic_score + w["fuzzy"] * fuzzy_score
     return {
         "semantic_score": round(semantic_score, 4),
@@ -253,6 +258,7 @@ def explain_pair(
     semantic_score: float,
     fuzzy_score: float,
     is_same_script: bool,
+    domain: str = DEFAULT_DOMAIN,
 ) -> TokenAttribution:
     """
     Full attribution for a record pair.
@@ -286,7 +292,7 @@ def explain_pair(
         sum(1 for m in aligned_a if m.match) / len(aligned_a), 3
     ) if aligned_a else 0.0
 
-    decomp = decompose_score(semantic_score, fuzzy_score, is_same_script)
+    decomp = decompose_score(semantic_score, fuzzy_score, is_same_script, domain=domain)
 
     return TokenAttribution(
         text_a=text_a,
@@ -315,6 +321,7 @@ def explain_pair_as_dict(
     semantic_score: float,
     fuzzy_score: float,
     is_same_script: bool,
+    domain: str = DEFAULT_DOMAIN,
 ) -> Dict:
     """JSON-serialisable version for the API."""
     result = explain_pair(record_a, record_b, semantic_score, fuzzy_score, is_same_script)
