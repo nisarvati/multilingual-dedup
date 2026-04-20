@@ -52,13 +52,27 @@ export interface Metrics {
   f1?: number;
 }
 
+export interface ArbiterDecision {
+  text_a: string;
+  text_b: string;
+  similarity_score: number;
+  is_duplicate: boolean;
+  confidence: number;
+  reasoning: string;
+  abstained: boolean;
+}
+
 export interface ResultsResponse {
   clusters: Cluster[];
   grey_zone_pairs: GreyZonePair[];
-  arbiter_decisions: number;
-  metrics: Metrics;
+  arbiter_decisions: ArbiterDecision[];
+  metrics: Metrics | null;
   total_records: number;
   total_clusters: number;
+  domain?: string;
+  threshold_used?: number;
+  domain_config?: Record<string, any>;
+  language_breakdown?: Record<string, { clustered: number; unique: number }>;
 }
 
 export interface ExplainResponse {
@@ -152,8 +166,35 @@ function mockResults(): ResultsResponse {
   return {
     clusters,
     grey_zone_pairs,
-    arbiter_decisions: 17,
-    metrics: { precision: 0.94, recall: 0.91, f1: 0.925 },
+    arbiter_decisions: [
+  {
+    text_a: "Microsoft Corporation",
+    text_b: "Microsoft Corp.",
+    similarity_score: 0.782,
+    is_duplicate: true,
+    confidence: 0.94,
+    reasoning: "Same company, abbreviated legal suffix",
+    abstained: false,
+  },
+  {
+    text_a: "iPhone 15 Pro",
+    text_b: "iPhone 15 Pro Max",
+    similarity_score: 0.812,
+    is_duplicate: false,
+    confidence: 0.89,
+    reasoning: "Different product lines — Pro vs Pro Max are distinct models",
+    abstained: false,
+  },
+],
+metrics: { precision: 0.94, recall: 0.91, f1: 0.925 },
+domain: "E-commerce Products",
+threshold_used: 0.76,
+language_breakdown: {
+  en: { clustered: 42, unique: 8 },
+  ja: { clustered: 28, unique: 4 },
+  zh: { clustered: 18, unique: 3 },
+  ar: { clustered: 12, unique: 2 },
+},
     total_records: 1234,
     total_clusters: clusters.length,
   };
@@ -206,12 +247,12 @@ export const api = {
     }
   },
   async results(jobId: string): Promise<ResultsResponse> {
-    try {
-      return await request<ResultsResponse>(`/results/${jobId}`);
-    } catch {
-      return mockResults();
-    }
-  },
+  try {
+    return await request<ResultsResponse>(`/results/${jobId}`, undefined, 10000); // 60s timeout
+  } catch {
+    return mockResults();
+  }
+},
   async explain(a: RecordItem, b: RecordItem): Promise<ExplainResponse> {
     try {
       return await request<ExplainResponse>("/explain", {
