@@ -156,7 +156,7 @@ export interface ResultsResponse {
   domain?: string;
   threshold_used?: number;
   language_breakdown?: Record<string, { clustered: number; unique: number }>;
-  arbiter_status?: string;
+  arbiter_status?: "skipped" | "done";
   arbiter_message?: string;
 }
 
@@ -354,7 +354,7 @@ export const api = {
       domain: res.domain ?? undefined,
       threshold_used: res.threshold_used ?? undefined,
       language_breakdown: res.language_breakdown ?? undefined,
-      arbiter_status: res.arbiter_status ?? undefined,
+      arbiter_status: res.arbiter_status === "skipped" ? "skipped" : res.arbiter_status === "done" ? "done" : undefined,
       arbiter_message: res.arbiter_message ?? undefined,
     };
   },

@@ -6,7 +6,7 @@ interface Props {
   jobId: string;
   decisions: ArbiterDecision[];
   selectedRecordId?: string;
-  onInspect: (a: RecordItem, b: RecordItem) => void;
+  onInspect: (a: RecordItem, b: RecordItem, similarity?: number) => void;
 }
 
 export const DuplicateGroups = ({ clusters, jobId, decisions, selectedRecordId, onInspect }: Props) => {

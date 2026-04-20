@@ -14,7 +14,7 @@ interface Props {
   jobId: string;
   decisions: ArbiterDecision[];
   selectedRecordId?: string;
-  onInspect: (a: RecordItem, b: RecordItem) => void;
+  onInspect: (a: RecordItem, b: RecordItem, similarity?: number) => void;
 }
 
 const langColor = (lang: string) => {
@@ -105,7 +105,8 @@ export const ClusterCard = ({
                 <HeatmapView
                   jobId={jobId}
                   clusterIndex={clusterIndex}
-                  onCellClick={(recordA, recordB) => onInspect(recordA, recordB)}
+                  onCellClick={(recordA, recordB) => onInspect(recordA, recordB, cluster.similarity)}
+
                 />
               </li>
             )}
@@ -127,7 +128,7 @@ export const ClusterCard = ({
                     >
                       <button
                         type="button"
-                        onClick={() => onInspect(record, compareTo)}
+                        onClick={() => onInspect(record, compareTo, cluster.similarity)}
                         className="flex min-w-0 flex-1 items-start gap-3 text-left"
                       >
                         <span

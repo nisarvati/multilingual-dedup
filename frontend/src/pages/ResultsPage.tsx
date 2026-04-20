@@ -121,7 +121,7 @@ export default function ResultsPage() {
   const [data, setData] = useState<ResultsResponse | null>(null);
   const [threshold, setThreshold] = useState(0.76);
   const [sortBy, setSortBy] = useState<SortOption>("similarity");
-  const [pair, setPair] = useState<{ a: RecordItem; b: RecordItem } | undefined>();
+  const [pair, setPair] = useState<{ a: RecordItem; b: RecordItem; similarity?: number } | undefined>();
   const [feedbackByPair, setFeedbackByPair] = useState<Record<string, FeedbackState>>({});
 
   useEffect(() => {
@@ -220,7 +220,7 @@ export default function ResultsPage() {
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                   <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                    Job 
+                    Job
                     {/* <span className="font-mono tracking-normal">{jobId}</span> */}
                   </div>
                   <h1 className="mt-1 text-2xl font-semibold tracking-tight">Overview</h1>
@@ -335,7 +335,7 @@ export default function ResultsPage() {
                           jobId={jobId}
                           decisions={data.arbiter_decisions}
                           selectedRecordId={pair?.a.id}
-                          onInspect={(a, b) => setPair({ a, b })}
+                          onInspect={(a, b, similarity) => setPair({ a, b, similarity })}
                         />
                       </motion.div>
                     )}
@@ -432,7 +432,7 @@ export default function ResultsPage() {
                             size="sm"
                             variant="ghost"
                             className="text-subtle hover:text-foreground"
-                            onClick={() => setPair({ a: greyPair.record_a, b: greyPair.record_b })}
+                            onClick={() => setPair({ a: greyPair.record_a, b: greyPair.record_b, similarity: greyPair.similarity })}
                           >
                             Inspect {"->"}
                           </Button>
