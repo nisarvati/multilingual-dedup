@@ -47,7 +47,7 @@ export const ClusterCard = ({
   selectedRecordId,
   onInspect,
 }: Props) => {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const [showHeatmap, setShowHeatmap] = useState(false);
 
   return (
@@ -61,7 +61,7 @@ export const ClusterCard = ({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
       >
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
             <Users className="h-4 w-4" />
           </div>
@@ -77,6 +77,7 @@ export const ClusterCard = ({
           />
         </div>
       </button>
+
       <AnimatePresence initial={false}>
         {open && (
           <motion.ul
@@ -109,100 +110,103 @@ export const ClusterCard = ({
               </li>
             )}
 
-            {cluster.records.map((r, i) => {
-              const compareTo = cluster.records[(i + 1) % cluster.records.length];
-              const active = r.id === selectedRecordId;
-              const decision = getDecision(decisions, r, compareTo);
-              return (
-                <li
-                  key={r.id}
-                  className={cn(
-                    "group flex items-start gap-3 px-5 py-3 transition-colors hover:bg-surface-elevated",
-                    active && "bg-primary/5"
-                  )}
-                >
-                  <button
-                    type="button"
-                    onClick={() => onInspect(r, compareTo)}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-start gap-3 text-left"
-                    )}
-                  >
-                    <span
+            <li>
+              <ul className="max-h-[18rem] overflow-y-auto">
+                {cluster.records.map((record, index) => {
+                  const compareTo = cluster.records[(index + 1) % cluster.records.length];
+                  const active = record.id === selectedRecordId;
+                  const decision = getDecision(decisions, record, compareTo);
+
+                  return (
+                    <li
+                      key={record.id}
                       className={cn(
-                        "mt-0.5 inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px] uppercase tracking-wider",
-                        langColor(r.language)
+                        "group flex items-start gap-3 px-5 py-3 transition-colors hover:bg-surface-elevated",
+                        active && "bg-primary/5"
                       )}
                     >
-                      {r.language}
-                    </span>
-                    <span className="flex-1 truncate text-sm text-foreground/90 group-hover:text-foreground">
-                      {r.text}
-                    </span>
-                    <span className="text-[10px] font-mono text-muted-foreground">{r.id}</span>
-                  </button>
-
-                  {cluster.records.length > 1 && (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[10px] text-subtle transition-colors hover:bg-background hover:text-foreground"
-                        >
-                          <Eye className="h-3 w-3" />
-                          Reasoning
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent align="end" className="w-80 border-border/60 bg-surface p-4">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs uppercase tracking-wider text-muted-foreground">
-                              Pair reasoning
-                            </div>
-                            <SimilarityBadge value={decision?.similarity_score ?? cluster.similarity} />
-                          </div>
-                          <div className="space-y-1 text-xs text-subtle">
-                            <div className="rounded-lg border border-border/60 bg-background/40 p-2">
-                              A: {r.text}
-                            </div>
-                            <div className="rounded-lg border border-border/60 bg-background/40 p-2">
-                              B: {compareTo.text}
-                            </div>
-                          </div>
-                          {decision ? (
-                            <>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-subtle">Verdict</span>
-                                <span className={decision.is_duplicate ? "font-medium text-emerald-300" : "font-medium text-rose-300"}>
-                                  {decision.is_duplicate ? "Duplicate" : "Different"}
-                                </span>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center justify-between text-xs text-subtle">
-                                  <span>Confidence</span>
-                                  <span>{Math.round(decision.confidence * 100)}%</span>
-                                </div>
-                                <div className="h-2 rounded-full bg-background/80">
-                                  <div
-                                    className="h-2 rounded-full bg-primary"
-                                    style={{ width: `${decision.confidence * 100}%` }}
-                                  />
-                                </div>
-                              </div>
-                              <p className="text-xs leading-relaxed text-subtle">{decision.reasoning}</p>
-                            </>
-                          ) : (
-                            <p className="text-xs leading-relaxed text-subtle">
-                              Decided by embedding model — confidence above threshold.
-                            </p>
+                      <button
+                        type="button"
+                        onClick={() => onInspect(record, compareTo)}
+                        className="flex min-w-0 flex-1 items-start gap-3 text-left"
+                      >
+                        <span
+                          className={cn(
+                            "mt-0.5 inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px] uppercase tracking-wider",
+                            langColor(record.language)
                           )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  )}
-                </li>
-              );
-            })}
+                        >
+                          {record.language}
+                        </span>
+                        <span className="flex-1 truncate text-sm text-foreground/90 group-hover:text-foreground">
+                          {record.text}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted-foreground">{record.id}</span>
+                      </button>
+
+                      {cluster.records.length > 1 && (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex h-7 shrink-0 items-center gap-1 rounded-md border border-border/60 bg-background/40 px-2 text-[10px] text-subtle transition-colors hover:bg-background hover:text-foreground"
+                            >
+                              <Eye className="h-3 w-3" />
+                              Reasoning
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-80 border-border/60 bg-surface p-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs uppercase tracking-wider text-muted-foreground">
+                                  Pair reasoning
+                                </div>
+                                <SimilarityBadge value={decision?.similarity_score ?? cluster.similarity} />
+                              </div>
+                              <div className="space-y-1 text-xs text-subtle">
+                                <div className="rounded-lg border border-border/60 bg-background/40 p-2">
+                                  A: {record.text}
+                                </div>
+                                <div className="rounded-lg border border-border/60 bg-background/40 p-2">
+                                  B: {compareTo.text}
+                                </div>
+                              </div>
+                              {decision ? (
+                                <>
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-subtle">Verdict</span>
+                                    <span className={decision.is_duplicate ? "font-medium text-emerald-300" : "font-medium text-rose-300"}>
+                                      {decision.is_duplicate ? "Duplicate" : "Different"}
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center justify-between text-xs text-subtle">
+                                      <span>Confidence</span>
+                                      <span>{Math.round(decision.confidence * 100)}%</span>
+                                    </div>
+                                    <div className="h-2 rounded-full bg-background/80">
+                                      <div
+                                        className="h-2 rounded-full bg-primary"
+                                        style={{ width: `${decision.confidence * 100}%` }}
+                                      />
+                                    </div>
+                                  </div>
+                                  <p className="text-xs leading-relaxed text-subtle">{decision.reasoning}</p>
+                                </>
+                              ) : (
+                                <p className="text-xs leading-relaxed text-subtle">
+                                  Decided by embedding model - confidence above threshold.
+                                </p>
+                              )}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
           </motion.ul>
         )}
       </AnimatePresence>

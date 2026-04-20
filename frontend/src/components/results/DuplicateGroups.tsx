@@ -13,7 +13,7 @@ export const DuplicateGroups = ({ clusters, jobId, decisions, selectedRecordId, 
   if (!clusters.length) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-surface p-10 text-center text-subtle">
-        No clusters match the current filters. Try lowering the similarity threshold.
+        No clusters match the current threshold.
       </div>
     );
   }

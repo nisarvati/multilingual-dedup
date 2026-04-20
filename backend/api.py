@@ -167,6 +167,8 @@ class ResultsResponse(BaseModel):
     clusters: Optional[List[List[Dict]]]
     grey_zone_pairs: Optional[List[Dict]]
     arbiter_decisions: Optional[List[Dict]]
+    arbiter_status: Optional[str]
+    arbiter_message: Optional[str]
     total_records: Optional[int]
     total_clusters: Optional[int]
     domain: Optional[str]
@@ -338,6 +340,8 @@ def get_results(job_id: str):
         clusters=r.get("clusters"),
         grey_zone_pairs=r.get("grey_zone_pairs"),
         arbiter_decisions=r.get("arbiter_decisions"),
+        arbiter_status=r.get("arbiter_status"),
+        arbiter_message=r.get("arbiter_message"),
         total_records=r.get("total_records"),
         total_clusters=r.get("total_clusters"),
         domain=r.get("domain"),
@@ -794,11 +798,13 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
         # ---- Stage 6: LLM Arbitration ----
         update_job(job_id, stage="Running LLM arbitration...", progress=75)
         arbiter_decisions = []
+        arbiter_status = "skipped"
+        arbiter_message = "LLM arbiter did not run for this job."
         try:
             from llm_arbiter import run_arbitration, UnionFind as ArbiterUF
             openai_key = os.getenv("OPENAI_API_KEY")
             if not openai_key:
-                raise ValueError("No OPENAI_API_KEY set — skipping arbiter.")
+                raise ValueError("No OPENAI_API_KEY set - skipping arbiter.")
 
             n = len(records)
             uf = ArbiterUF(n)
@@ -827,9 +833,13 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
                 }
                 for d in decisions
             ]
+            arbiter_status = "completed"
+            arbiter_message = f"Reviewed {len(arbiter_decisions)} grey-zone pairs with the LLM arbiter."
         except Exception as e:
             print(f"[arbiter] Skipped: {e}")
-            update_job(job_id, stage="Arbiter skipped — clustering complete...")
+            arbiter_status = "skipped"
+            arbiter_message = str(e)
+            update_job(job_id, stage="Arbiter skipped - clustering complete...")
 
         # ---- Stage 7: Build response payload ----
         update_job(job_id, stage="Preparing results...", progress=90)
@@ -858,6 +868,8 @@ def _run_pipeline_thread(job_id: str, raw_rows: List[Dict], req: RunRequest):
             "clusters": clusters_enriched,
             "grey_zone_pairs": grey_zone_enriched,
             "arbiter_decisions": arbiter_decisions,
+            "arbiter_status": arbiter_status,
+            "arbiter_message": arbiter_message,
             "domain": domain,
             "threshold_used": threshold,
             "domain_config": config,

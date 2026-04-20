@@ -8,15 +8,12 @@ interface Props {
 
 export const ThresholdSlider = ({ value, onChange, matchedCount }: Props) => {
   return (
-    <div className="rounded-2xl border border-border/60 bg-surface p-4">
-      <div className="mb-3 flex items-baseline justify-between">
+    <div>
+      <div className="mb-2 flex items-baseline justify-between">
         <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground">
-            Similarity threshold
-          </div>
           <div className="mt-0.5 text-xs text-subtle">{matchedCount} clusters match</div>
         </div>
-        <div className="font-mono text-lg tabular-nums">{value.toFixed(2)}</div>
+        <div className="font-mono text-base tabular-nums">{value.toFixed(2)}</div>
       </div>
       <Slider
         min={0.6}

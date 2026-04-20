@@ -1,14 +1,17 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Sparkles, Languages, Hash } from "lucide-react";
+import { Hash, Languages, Sparkles, ThumbsDown, ThumbsUp } from "lucide-react";
 import { api, ExplainResponse, RecordItem, estimateRecordSimilarity } from "@/lib/backendApi";
 import { SimilarityBadge } from "./SimilarityBadge";
 import { TokenAttribution } from "@/components/explain/TokenAttribution";
-import { FeedbackButtons } from "@/components/feedback/FeedbackButtons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface Props {
   pair?: { a: RecordItem; b: RecordItem };
+  feedbackState?: "confirm" | "reject";
+  onFeedback?: (value: "confirm" | "reject") => void;
 }
 
 const RecordPanel = ({ r, label }: { r: RecordItem; label: string }) => (
@@ -27,7 +30,7 @@ const RecordPanel = ({ r, label }: { r: RecordItem; label: string }) => (
   </div>
 );
 
-export const RecordInspector = ({ pair }: Props) => {
+export const RecordInspector = ({ pair, feedbackState, onFeedback }: Props) => {
   const [explain, setExplain] = useState<ExplainResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -38,9 +41,9 @@ export const RecordInspector = ({ pair }: Props) => {
     setExplain(null);
     api
       .explain(pair.a, pair.b, estimateRecordSimilarity(pair.a, pair.b))
-      .then((r) => {
+      .then((response) => {
         if (!alive) return;
-        setExplain(r);
+        setExplain(response);
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -82,8 +85,8 @@ export const RecordInspector = ({ pair }: Props) => {
         {explain && <SimilarityBadge value={explain.similarity} />}
       </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-thin p-5 space-y-5">
-        <div className="grid gap-3 md:grid-cols-2">
+      <div className="flex-1 space-y-5 overflow-y-auto p-5 scrollbar-thin">
+        <div className="grid gap-3 xl:grid-cols-2">
           <RecordPanel r={pair.a} label="A" />
           <RecordPanel r={pair.b} label="B" />
         </div>
@@ -110,7 +113,41 @@ export const RecordInspector = ({ pair }: Props) => {
           )}
         </div>
 
-        <FeedbackButtons />
+        <div className="rounded-xl border border-border/60 bg-surface-elevated p-4">
+          <div className="mb-3 text-sm font-medium">Review this pair</div>
+          <div className="flex flex-wrap gap-2">
+            {feedbackState !== "reject" && (
+              <Button
+                size="sm"
+                variant={feedbackState === "confirm" ? "default" : "outline"}
+                className={cn(
+                  "gap-1.5",
+                  feedbackState === "confirm" &&
+                    "bg-emerald-600 text-white hover:bg-emerald-600"
+                )}
+                onClick={() => onFeedback?.("confirm")}
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+                {feedbackState === "confirm" ? "Confirmed" : "Confirm"}
+              </Button>
+            )}
+            {feedbackState !== "confirm" && (
+              <Button
+                size="sm"
+                variant={feedbackState === "reject" ? "default" : "outline"}
+                className={cn(
+                  "gap-1.5",
+                  feedbackState === "reject" &&
+                    "bg-rose-600 text-white hover:bg-rose-600"
+                )}
+                onClick={() => onFeedback?.("reject")}
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+                {feedbackState === "reject" ? "Rejected" : "Reject"}
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
     </motion.div>
   );

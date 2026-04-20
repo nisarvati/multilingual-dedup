@@ -41,6 +41,10 @@ interface BackendResultsResponse {
   domain?: string | null;
   threshold_used?: number | null;
   language_breakdown?: Record<string, { clustered: number; unique: number }> | null;
+  arbiter_status?: string | null;
+  arbiter_message?: string | null;
+  arbiter_results?: ArbiterDecision[] | null;
+  decisions?: ArbiterDecision[] | null;
 }
 
 interface BackendHeatmapResponse {
@@ -152,6 +156,8 @@ export interface ResultsResponse {
   domain?: string;
   threshold_used?: number;
   language_breakdown?: Record<string, { clustered: number; unique: number }>;
+  arbiter_status?: string;
+  arbiter_message?: string;
 }
 
 export interface ExplainResponse {
@@ -336,16 +342,20 @@ export const api = {
       })
     );
 
+    const arbiterDecisions = res.arbiter_decisions ?? res.arbiter_results ?? res.decisions ?? [];
+
     return {
       clusters,
       grey_zone_pairs,
-      arbiter_decisions: res.arbiter_decisions ?? [],
+      arbiter_decisions: arbiterDecisions,
       metrics: res.metrics ?? null,
       total_records: res.total_records ?? 0,
       total_clusters: res.total_clusters ?? clusters.length,
       domain: res.domain ?? undefined,
       threshold_used: res.threshold_used ?? undefined,
       language_breakdown: res.language_breakdown ?? undefined,
+      arbiter_status: res.arbiter_status ?? undefined,
+      arbiter_message: res.arbiter_message ?? undefined,
     };
   },
 
@@ -391,8 +401,21 @@ export const api = {
     };
   },
 
-  exportResults(jobId: string, format: "csv" | "pdf") {
-    window.open(`${API_BASE}/export/${jobId}?format=${format}`, "_blank");
+  async exportResults(jobId: string, format: "csv" | "pdf"): Promise<void> {
+    const response = await fetch(`${API_BASE}/export/${jobId}?format=${format}`);
+    if (!response.ok) {
+      throw new Error(`Failed to export ${format.toUpperCase()} report.`);
+    }
+
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    anchor.download = `dedup-results-${jobId}.${format}`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(blobUrl);
   },
 
   async rethreshold(
