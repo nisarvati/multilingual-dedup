@@ -9,3 +9,4 @@ google-genai==0.3.0
 python-dotenv==1.0.1
 scikit-learn==1.5.2
 langdetect==1.0.9
+reportlab==4.2.0

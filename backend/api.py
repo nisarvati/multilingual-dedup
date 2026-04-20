@@ -465,8 +465,7 @@ def explain(req: ExplainRequest):
 
 
 @app.get("/export/{job_id}")
-def export_results(job_id: str):
-    """Download deduplicated results as CSV."""
+def export_results(job_id: str, format: str = "csv"):
     if job_id not in jobs:
         raise HTTPException(404, "Job not found.")
 
@@ -476,12 +475,27 @@ def export_results(job_id: str):
 
     records = j.get("records", [])
     clusters = j["results"].get("clusters", [])
+    domain = j["results"].get("domain", "E-commerce Products")
+    threshold = j["results"].get("threshold_used", 0.76)
+    total_records = j["results"].get("total_records", 0)
+    total_clusters = j["results"].get("total_clusters", 0)
 
+    # Build cluster_id mapping
     record_to_cluster = {}
     for idx, cluster in enumerate(clusters):
         for record in cluster:
             record_to_cluster[record["id"]] = idx + 1
 
+    if format == "pdf":
+        return _export_pdf(
+            records, clusters, record_to_cluster,
+            domain, threshold, total_records, total_clusters, job_id
+        )
+    else:
+        return _export_csv(records, record_to_cluster, job_id)
+
+
+def _export_csv(records, record_to_cluster, job_id):
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["id", "text", "language", "cluster_id", "is_duplicate"])
@@ -495,7 +509,6 @@ def export_results(job_id: str):
             cluster_id,
             is_dup,
         ])
-
     output.seek(0)
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode()),
@@ -505,6 +518,178 @@ def export_results(job_id: str):
         },
     )
 
+
+def _export_pdf(records, clusters, record_to_cluster, domain, threshold,
+                total_records, total_clusters, job_id):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.lib import colors
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    )
+    from reportlab.lib.enums import TA_CENTER
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=2*cm, leftMargin=2*cm,
+        topMargin=2*cm, bottomMargin=2*cm,
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        "Title", parent=styles["Title"],
+        fontSize=20, spaceAfter=6, textColor=colors.HexColor("#1a1a2e")
+    )
+    heading_style = ParagraphStyle(
+        "Heading", parent=styles["Heading2"],
+        fontSize=13, spaceAfter=4, textColor=colors.HexColor("#16213e")
+    )
+    body_style = ParagraphStyle(
+        "Body", parent=styles["Normal"],
+        fontSize=9, spaceAfter=3
+    )
+    small_style = ParagraphStyle(
+        "Small", parent=styles["Normal"],
+        fontSize=8, textColor=colors.grey
+    )
+
+    story = []
+
+    # ---- Title ----
+    story.append(Paragraph("Multilingual Deduplication Report", title_style))
+    story.append(Paragraph(f"Job ID: {job_id[:8]}  |  Domain: {domain}  |  Threshold: {threshold}", small_style))
+    story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#e0e0e0")))
+    story.append(Spacer(1, 0.4*cm))
+
+    # ---- Summary stats ----
+    story.append(Paragraph("Summary", heading_style))
+    duplicate_records = len(record_to_cluster)
+    unique_records = total_records - duplicate_records
+    reduction_pct = round((duplicate_records / total_records * 100), 1) if total_records else 0
+
+    summary_data = [
+        ["Metric", "Value"],
+        ["Total records processed", str(total_records)],
+        ["Unique entities found", str(unique_records)],
+        ["Duplicate records flagged", str(duplicate_records)],
+        ["Duplicate groups", str(total_clusters)],
+        ["Data reduction", f"{reduction_pct}%"],
+        ["Domain", domain],
+        ["Threshold used", str(threshold)],
+    ]
+    summary_table = Table(summary_data, colWidths=[8*cm, 8*cm])
+    summary_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a1a2e")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f5f5f5")]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e0e0e0")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 0.6*cm))
+
+    # ---- Duplicate groups ----
+    story.append(Paragraph(f"Duplicate Groups ({len(clusters)} groups)", heading_style))
+    story.append(Paragraph(
+        "Records in the same group refer to the same real-world entity across languages.",
+        small_style
+    ))
+    story.append(Spacer(1, 0.3*cm))
+
+    for idx, cluster in enumerate(clusters[:50]):  # cap at 50 groups in PDF
+        story.append(Paragraph(
+            f"Group {idx + 1} — {len(cluster)} records",
+            ParagraphStyle("GroupHeader", parent=styles["Normal"],
+                          fontSize=9, fontName="Helvetica-Bold",
+                          textColor=colors.HexColor("#16213e"))
+        ))
+        group_data = [["ID", "Text", "Language"]]
+        for record in cluster:
+            text = record["text"][:60] + "..." if len(record["text"]) > 60 else record["text"]
+            group_data.append([record["id"], text, record.get("language", "")])
+
+        group_table = Table(group_data, colWidths=[2.5*cm, 11*cm, 2.5*cm])
+        group_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8eaf6")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#e0e0e0")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fafafa")]),
+        ]))
+        story.append(group_table)
+        story.append(Spacer(1, 0.2*cm))
+
+    if len(clusters) > 50:
+        story.append(Paragraph(
+            f"... and {len(clusters) - 50} more groups. Download CSV for full data.",
+            small_style
+        ))
+
+    # ---- Full records table ----
+    story.append(Spacer(1, 0.4*cm))
+    story.append(Paragraph("All Records", heading_style))
+    story.append(Paragraph("Complete list with duplicate flags.", small_style))
+    story.append(Spacer(1, 0.3*cm))
+
+    records_data = [["ID", "Text", "Lang", "Cluster", "Duplicate"]]
+    for record in records[:200]:  # cap at 200 rows for PDF readability
+        text = record["text"][:45] + "..." if len(record["text"]) > 45 else record["text"]
+        cluster_id = record_to_cluster.get(record["id"], "-")
+        is_dup = "Yes" if record["id"] in record_to_cluster else "No"
+        records_data.append([
+            record["id"], text, record.get("language", ""),
+            str(cluster_id), is_dup
+        ])
+
+    records_table = Table(records_data, colWidths=[2*cm, 9.5*cm, 1.5*cm, 2*cm, 1*cm])
+    records_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1a1a2e")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#e0e0e0")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f9f9f9")]),
+        # Highlight duplicate rows
+        *[
+            ("TEXTCOLOR", (4, i+1), (4, i+1), colors.red)
+            for i, record in enumerate(records[:200])
+            if record["id"] in record_to_cluster
+        ],
+    ]))
+    story.append(records_table)
+
+    if len(records) > 200:
+        story.append(Spacer(1, 0.2*cm))
+        story.append(Paragraph(
+            f"Showing 200 of {len(records)} records. Download CSV for complete data.",
+            small_style
+        ))
+
+    doc.build(story)
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=dedup_report_{job_id[:8]}.pdf"
+        },
+    )
 
 # ============================================================
 # BACKGROUND PIPELINE RUNNER
