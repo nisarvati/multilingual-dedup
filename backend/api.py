@@ -597,6 +597,56 @@ def _export_pdf(records, clusters, record_to_cluster, domain, threshold,
     story.append(summary_table)
     story.append(Spacer(1, 0.6*cm))
 
+@app.get("/heatmap/{job_id}/{cluster_index}")
+def get_heatmap(job_id: str, cluster_index: int):
+    if job_id not in jobs:
+        raise HTTPException(404, "Job not found.")
+
+    j = jobs[job_id]
+
+    if j["status"] != "done":
+        raise HTTPException(400, "Job not complete yet.")
+    if not j.get("combined_matrix"):
+        raise HTTPException(400, "Cached matrix not found. Re-run the pipeline.")
+
+    clusters = j["results"]["clusters"]
+
+    if cluster_index >= len(clusters):
+        raise HTTPException(404, "Cluster index out of range.")
+
+    cluster = clusters[cluster_index]
+    records = j.get("records", [])
+    matrix = np.array(j.get("combined_matrix", []))
+
+    id_to_idx = {r["id"]: i for i, r in enumerate(records)}
+
+    n = len(cluster)
+    heatmap_data = []
+
+    for i in range(n):
+        row = []
+        for k in range(n):
+            if i == k:
+                row.append(1.0)
+            else:
+                idx_i = id_to_idx.get(cluster[i]["id"])
+                idx_k = id_to_idx.get(cluster[k]["id"])
+                if idx_i is not None and idx_k is not None:
+                    row.append(round(float(matrix[idx_i][idx_k]), 4))
+                else:
+                    row.append(0.0)
+        heatmap_data.append(row)
+
+    return {
+        "cluster_index": cluster_index,
+        "records": [
+            {"id": r["id"], "text": r["text"], "language": r.get("language", "")}
+            for r in cluster
+        ],
+        "matrix": heatmap_data,
+        "threshold": j["results"].get("threshold_used", 0.76),
+    }
+    
     # ---- Duplicate groups ----
     story.append(Paragraph(f"Duplicate Groups ({len(clusters)} groups)", heading_style))
     story.append(Paragraph(
