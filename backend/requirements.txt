@@ -2,7 +2,7 @@ fastapi==0.115.0
 uvicorn[standard]==0.32.0
 python-multipart==0.0.12
 sentence-transformers==3.2.1
-rapidfuzz==3.10.0
+rapidfuzz==3.9.7
 numpy==1.26.4
 pandas==2.2.3
 google-genai==0.3.0
