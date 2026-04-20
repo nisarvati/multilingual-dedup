@@ -85,13 +85,6 @@ export interface UploadResponse {
   warnings?: string[];
 }
 
-export interface HeatmapResponse {
-  cluster_index: number;
-  records: { id: string; text: string; language: string }[];
-  matrix: number[][];
-  threshold: number;
-}
-
 export interface RunBody {
   job_id: string;
   text_column: string;
