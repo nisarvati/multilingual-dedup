@@ -100,7 +100,7 @@ export default function ProcessingConnected() {
             <h1 className="text-3xl font-semibold tracking-tight">Processing your dedup run</h1>
             <p className="max-w-2xl text-sm text-subtle">
               {threshold
-                ? `Using threshold ${threshold}. We are polling the backend and will redirect as soon as the results are ready.`
+                ? `We are polling the backend and will redirect as soon as the results are ready.`
                 : "We are polling the backend and will redirect as soon as the results are ready."}
             </p>
           </div>

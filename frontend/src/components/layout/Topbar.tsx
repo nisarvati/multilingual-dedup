@@ -23,9 +23,9 @@ export const Topbar = ({
             <span className="h-1.5 w-1.5 animate-pulse-glow rounded-full bg-success" />
             API - localhost:8000
           </span>
-          <Button variant="ghost" size="sm" className="text-subtle hover:text-foreground">
+          {/* <Button variant="ghost" size="sm" className="text-subtle hover:text-foreground">
             <Github className="h-4 w-4" />
-          </Button>
+          </Button> */}
         </div>
       </div>
     </header>

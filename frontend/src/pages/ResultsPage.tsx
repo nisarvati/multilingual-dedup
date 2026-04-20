@@ -220,7 +220,8 @@ export default function ResultsPage() {
               <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                 <div>
                   <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
-                    Job <span className="font-mono tracking-normal">{jobId}</span>
+                    Job 
+                    {/* <span className="font-mono tracking-normal">{jobId}</span> */}
                   </div>
                   <h1 className="mt-1 text-2xl font-semibold tracking-tight">Overview</h1>
                   <p className="mt-1 max-w-3xl text-sm text-subtle">
@@ -259,7 +260,7 @@ export default function ResultsPage() {
                         Similarity threshold
                       </div>
                       <div className="mt-1 text-sm text-subtle">
-                        {filteredClusters.length} visible groups
+                        {filteredClusters.length} clusters match
                       </div>
                     </div>
                     <div className="font-mono text-lg tabular-nums">{threshold.toFixed(2)}</div>
