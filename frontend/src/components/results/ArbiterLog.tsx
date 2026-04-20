@@ -1,14 +1,6 @@
 // components/results/ArbiterLog.tsx
 
-interface ArbiterDecision {
-  text_a: string
-  text_b: string
-  similarity_score: number
-  is_duplicate: boolean
-  confidence: number
-  reasoning: string
-  abstained: boolean
-}
+import type { ArbiterDecision } from "@/lib/backendApi"
 
 interface Props {
   decisions: ArbiterDecision[]
